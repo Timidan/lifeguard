@@ -84,8 +84,11 @@ async function broadcastAndWaitSafe(raw) {
   try {
     hash = (await base.broadcastTransaction(raw)).hash;
   } catch (e) {
-    hash = ethers.keccak256(raw); // already known to the node
+    hash = ethers.keccak256(raw);
     if (!/already known|nonce too low/i.test(e.message)) throw e;
+    if (/nonce too low/i.test(e.message) && !(await base.getTransactionReceipt(hash))) {
+      throw new Error('This nonce was used by another transaction; prove that one first (node cli.js confirm) or reset the nonce');
+    }
   }
   const receipt = await base.waitForTransaction(hash, 1, 240000);
   for (;;) {

@@ -62,10 +62,34 @@ async function agentKey() {
   console.log(`agent key ${key.getPublicKey()} on ${s.owner}: receiver ${s.contract}, methods request_action + confirm, 1 NEAR gas allowance`);
 }
 
+/** Asks Read MPC to prove a mined transaction. Read MPC's view of `safe` can lag the public RPC, so wait and retry. */
+async function prove(acct, txHash) {
+  const s = L.state();
+  await L.sleep(45000);
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    const r = await L.call(acct, s.contract, 'confirm', { id: s.position, tx_hash: txHash });
+    if (r.value === true) return console.log(`  Read MPC proof accepted, nonce advanced  ${L.NEAR_EXPLORER}${r.txHash}`);
+    console.log(`  Read MPC proof attempt ${attempt}: not yet (${r.error || r.value})`);
+  }
+  throw new Error(`Not proven after 3 attempts; retry later with: node cli.js confirm ${txHash}`);
+}
+
+/** The nonce advances only on a proof, so a mined but unproven transaction must be proven before signing again. */
+async function settlePending(acct) {
+  for (const p of (await L.view('get_position', { id: L.state().position })).pending) {
+    const receipt = await L.base.getTransactionReceipt(p.tx_hash);
+    if (!receipt) continue;
+    if (receipt.status !== 1) throw new Error(`${p.tx_hash} reverted; reset the nonce: node cli.js reset ${Number(p.nonce) + 1}`);
+    console.log(`→ proving earlier transaction ${p.tx_hash} first`);
+    return prove(acct, p.tx_hash);
+  }
+}
+
 /** Has NEAR sign, broadcasts on Base, waits for `safe`, then asks Read MPC to prove it. */
 async function signBroadcastProve(accountPromise, method, args, label) {
   const s = L.state();
   const acct = await accountPromise;
+  await settlePending(acct);
   console.log(`→ ${label}`);
   const signed = await L.call(acct, s.contract, method, args);
   if (signed.error) throw new Error(`NEAR refused: ${signed.error}`);
@@ -76,8 +100,7 @@ async function signBroadcastProve(accountPromise, method, args, label) {
     console.log(`  Read MPC never proves a revert; the owner resets the nonce: node cli.js reset ${Number(signed.value.nonce) + 1}`);
     return;
   }
-  const proof = await L.call(acct, s.contract, 'confirm', { id: s.position, tx_hash: signed.value.tx_hash });
-  console.log(`  Read MPC proof ${proof.value === true ? 'accepted, nonce advanced' : `not accepted (${proof.error || proof.value})`}  ${L.NEAR_EXPLORER}${proof.txHash}`);
+  await prove(acct, signed.value.tx_hash);
 }
 
 async function owner(to, data, value = '0', gas = '300000') {
@@ -142,7 +165,7 @@ async function status() {
   const s = L.state();
   const p = await L.view('get_position', { id: s.position });
   const a = await L.account(p.address);
-  console.log(JSON.stringify({ contract: s.contract, owner: s.owner, position: s.position, address: p.address, nonce: p.nonce, pending: p.pending.length, health_factor: a.healthFactor, ...a, last: p.history.slice(-3) }, null, 1));
+  console.log(JSON.stringify({ contract: s.contract, owner: s.owner, position: s.position, address: p.address, nonce: p.nonce, pending: p.pending.length, ...a, healthFactor: Number.isFinite(a.healthFactor) ? a.healthFactor : 'no debt', last: p.history.slice(-3) }, null, 1));
 }
 
 const [cmd, ...args] = process.argv.slice(2);
