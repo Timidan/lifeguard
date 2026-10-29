@@ -45,6 +45,7 @@ function failureText(failure) {
 async function call(account, contractId, method, args, { deposit = 0n, gas = 300_000_000_000_000n } = {}) {
   const provider = account.connection.provider;
   let txHash;
+  account.accessKeyByPublicKeyCache = {}; // near-api-js caches the key nonce; a cached one goes stale after a failure
   try {
     const [hash, signed] = await account.signTransaction(contractId, [transactions.functionCall(method, args, gas, deposit)]);
     txHash = utils.serialize.base_encode(hash);

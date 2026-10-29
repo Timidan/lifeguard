@@ -6,6 +6,7 @@
 //   node cli.js agent-key                      give the agent a function-call key (request_action, confirm only)
 //   node cli.js owner <to> <calldata> [wei] [gas]    owner-signed call (setup: mint, borrow)
 //   node cli.js agent <supply|repay|approve> <usdc|cbeth> <amount> [gas]   the agent's loan-safe actions
+//   node cli.js confirm [tx_hash]              ask Read MPC to prove a signed transaction (default: first pending)
 //   node cli.js redteam                        try to hurt the position with the agent's key
 //   node cli.js status
 const { KeyPair, transactions, connect } = require('near-api-js');
@@ -93,6 +94,13 @@ async function agent(kind, asset, amount, gas = '300000') {
     { id: L.state().position, action, fees: await L.fees(Number(gas)) }, `agent ${kind} ${amount} ${asset}`);
 }
 
+async function confirm(txHash) {
+  const s = L.state();
+  txHash = txHash || (await L.view('get_position', { id: s.position })).pending[0]?.tx_hash;
+  const r = await L.call(await L.ownerAccount(), s.contract, 'confirm', { id: s.position, tx_hash: txHash });
+  console.log(`Read MPC proof for ${txHash}: ${r.value === true ? 'accepted, nonce advanced' : `not accepted (${r.error || r.value})`}  ${L.NEAR_EXPLORER}${r.txHash}`);
+}
+
 async function reset(nonce) {
   const r = await L.call(await L.ownerAccount(), L.state().contract, 'reset_nonce', { id: L.state().position, nonce: String(nonce) });
   console.log(r.error || `nonce reset to ${nonce}`);
@@ -138,9 +146,9 @@ async function status() {
 }
 
 const [cmd, ...args] = process.argv.slice(2);
-const commands = { deploy, position, 'agent-key': agentKey, owner, agent, reset, redteam, status };
+const commands = { deploy, position, 'agent-key': agentKey, owner, agent, confirm, reset, redteam, status };
 if (!commands[cmd]) {
-  console.log(fs.readFileSync(__filename, 'utf8').split('\n').slice(1, 11).join('\n'));
+  console.log(fs.readFileSync(__filename, 'utf8').split('\n').slice(1, 12).join('\n'));
   process.exit(1);
 }
 commands[cmd](...args).catch((e) => { console.error(e.message || e); process.exit(1); });
