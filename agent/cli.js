@@ -156,6 +156,7 @@ async function redteam() {
     const blocked = !!r.error;
     held += blocked;
     console.log(`${blocked ? 'BLOCKED' : 'ALLOWED'}  ${name.padEnd(30)} ${blocked ? layer.padEnd(18) + ' ' + r.error.replace(/\s+/g, ' ').slice(0, 110) : JSON.stringify(r.value)}`);
+    if (layer === 'Lifeguard contract') console.log(`         failed on chain: ${L.NEAR_EXPLORER}${r.txHash}`); // access-key refusals never reach the chain
   }
   console.log(`\n${held}/${attempts.length} attacks blocked`);
   process.exitCode = held === attempts.length ? 0 : 1;
