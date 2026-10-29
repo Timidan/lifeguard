@@ -74,7 +74,7 @@ function send(res, status, body, type = 'application/json') {
 function serveStatic(req, res) {
   const url = decodeURIComponent(new URL(req.url, 'http://x').pathname);
   let file = path.normalize(path.join(DIST, url));
-  if (!file.startsWith(DIST)) return send(res, 403, 'forbidden', 'text/plain');
+  if (file !== DIST && !file.startsWith(DIST + path.sep)) return send(res, 403, 'forbidden', 'text/plain');
   if (!fs.existsSync(file) || fs.statSync(file).isDirectory()) file = path.join(DIST, 'index.html');
   if (!fs.existsSync(file)) return send(res, 404, 'web/dist is missing: run npm run build in web/', 'text/plain');
   res.writeHead(200, { 'content-type': TYPES[path.extname(file)] || 'application/octet-stream' });

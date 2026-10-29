@@ -55,7 +55,7 @@ function Nav() {
       <a href="/" className="flex items-center gap-2 font-mono text-[0.8125rem] font-bold tracking-[0.12em] whitespace-nowrap"><PixelLogo cell={3} word={false} />LIFEGUARD</a>
       <div className="flex items-center gap-6 text-muted-foreground">
         <a href="#how" className="hidden hover:text-foreground sm:inline">How it works</a>
-        <a href="#proof" className="hidden hover:text-foreground sm:inline">Proof</a>
+        <a href="/app#rescue" className="hidden hover:text-foreground sm:inline">Proof</a>
         <a href="/app" className="tap rounded-full bg-safe px-4 py-1.5 font-semibold whitespace-nowrap text-background hover:opacity-85">Launch app</a>
       </div>
     </nav>
