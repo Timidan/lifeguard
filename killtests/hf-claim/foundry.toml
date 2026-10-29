@@ -1,0 +1,5 @@
+[profile.default]
+src = "test"
+test = "test"
+libs = ["lib"]
+remappings = ["forge-std/=lib/forge-std/src/"]

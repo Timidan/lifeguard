@@ -1,0 +1,67 @@
+{
+ "seconds": 22.095,
+ "lag": {
+  "safeBlocks": 214,
+  "safeSec": 42,
+  "finalizedBlocks": 5764,
+  "finalizedSec": 1152
+ },
+ "log": {
+  "tx": "0xf83112564b5658f4f66ff7f16fa2857c8b31db249abda728932103f35d7fba6e",
+  "logIndex": 3,
+  "block": 51871199
+ },
+ "nearTx": "6zavFwxpgzMf1RzpPREeEA2dFpweQAkcP9PNbjCCwr8v",
+ "status": {
+  "SuccessValue": "eyJwYXlsb2FkX2hhc2giOiJlZDdhNTVmOGNjMzQ4MjNmMjE1MDYzNjg4Y2ZkZGE2NTBlNzJjMmJiNDRiYTA2MWM5MDY1YWQ1ZTZiNWExNmEzIiwic2lnbmF0dXJlIjp7InNjaGVtZSI6IlNlY3AyNTZrMSIsImJpZ19yIjp7ImFmZmluZV9wb2ludCI6IjAyMGNhNWEzY2NiNjRkODQ3NGZjNTljYjI0MTNmMGYxMmNkZWQ2ZWUwYjM0NjYxYTExZTRjNDU1ZWE3MTk4MjliNiJ9LCJzIjp7InNjYWxhciI6IjNiZjEzN2YwMWU5MWJiODU1MDNjNTU3MDVhMjhhODk0MGRjN2UyZWE4NDRiMzM1OWE4MDU5NjJhMWU4ZTcxNmYifSwicmVjb3ZlcnlfaWQiOjB9fQ=="
+ },
+ "response": {
+  "payload_hash": "ed7a55f8cc34823f215063688cfdda650e72c2bb44ba061c9065ad5e6b5a16a3",
+  "signature": {
+   "scheme": "Secp256k1",
+   "big_r": {
+    "affine_point": "020ca5a3ccb64d8474fc59cb2413f0f12cded6ee0b34661a11e4c455ea719829b6"
+   },
+   "s": {
+    "scalar": "3bf137f01e91bb85503c55705a28a8940dc7e2ea844b3359a805962a1e8e716f"
+   },
+   "recovery_id": 0
+  }
+ },
+ "rawLog": {
+  "address": "0x036cbd53842c5426634e7929541ec2318f3dcf7e",
+  "topics": [
+   "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef",
+   "0x00000000000000000000000022f15011d4403ad3a9417e51ecb78ddc39cde4da",
+   "0x000000000000000000000000cf3478055a193e6125ed50553c64cd89c0f13e33"
+  ],
+  "data": "0x00000000000000000000000000000000000000000000000000000000000003e8",
+  "blockHash": "0xf32dcabb058c87549b6d02a25db356aa8a7c882871d8131eb92016abc1321de6",
+  "blockNumber": "0x3177ddf",
+  "blockTimestamp": "0x6ae386ec",
+  "transactionHash": "0xf83112564b5658f4f66ff7f16fa2857c8b31db249abda728932103f35d7fba6e",
+  "transactionIndex": "0x3",
+  "logIndex": "0x3",
+  "removed": false,
+  "blockTimestampMs": "0x1a188c70c38"
+ },
+ "args": {
+  "request": {
+   "request": {
+    "Base": {
+     "tx_id": "f83112564b5658f4f66ff7f16fa2857c8b31db249abda728932103f35d7fba6e",
+     "extractors": [
+      {
+       "Log": {
+        "log_index": 3
+       }
+      }
+     ],
+     "finality": "Safe"
+    }
+   },
+   "domain_id": 3,
+   "payload_version": 1
+  }
+ }
+}

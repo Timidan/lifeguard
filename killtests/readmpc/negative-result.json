@@ -1,0 +1,16 @@
+{
+ "nearTx": "2bxkvQXHj4NVMHwLzDk1xv2Kxs1crk2c5JAcRSAdrLSv",
+ "seconds": 120.671,
+ "status": {
+  "Failure": {
+   "ActionError": {
+    "index": 0,
+    "kind": {
+     "FunctionCallError": {
+      "ExecutionError": "Smart contract panicked: Request has timed out."
+     }
+    }
+   }
+  }
+ }
+}
