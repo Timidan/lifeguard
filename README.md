@@ -116,7 +116,7 @@ You need Rust, Node 22 and Foundry. None of these steps needs funds.
 
 - `contract/`: the NEAR contract in Rust (near-sdk 5.30). `src/evm.rs` holds the RLP encoder, the EIP-1559 hashing and the Aave calldata builders.
 - `agent/`: the relayer and red-team CLI (Node, near-api-js 5.1.1, ethers 6.13.4).
-- `web/`: one static page that reads the loan live from Aave and NEAR testnet, with the red-team record and the logbook. Serve it with `python3 -m http.server -d web` and open `http://localhost:8000`.
+- `web/`: the landing page and the app (Vite + React). The app lets a visitor fire the eight red-team attacks with the agent's real key and see which layer refused each one. Build it with `cd web && npm install && npm run build`, then run `node agent/server.js` and open `http://127.0.0.1:8740`. The server holds the agent's key; the browser never sees it.
 - `killtests/`: the experiments that de-risked the idea before the build (Aave health-factor fork test, Read MPC timing and payload hash, chain-signature broadcast).
 
 Libraries: near-sdk, bs58, near-api-js, ethers, forge-std. Code was written with AI coding assistance during the hackathon window.

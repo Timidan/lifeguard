@@ -118,7 +118,7 @@ async function account(address) {
 }
 
 const ATTACKER = '0x000000000000000000000000000000000000dEaD';
-const ATTACK_GAS = 30_000_000_000_000n; // every attack fails before the MPC call, so 30 Tgas is plenty
+const ATTACK_GAS = 10_000_000_000_000n; // every attack fails before the MPC call; the key's allowance is charged for prepaid gas
 
 /** What a compromised agent would try with its key. Each must fail. The CLI red team and the web server both run this list. */
 function attacks(s, f) {
