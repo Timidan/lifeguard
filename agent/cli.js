@@ -16,7 +16,6 @@ const L = require('./lib');
 
 const ASSETS = { usdc: { address: L.BASE.usdc, decimals: 6 }, cbeth: { address: L.BASE.cbeth, decimals: 18 } };
 const WASM = path.join(__dirname, '..', 'contract', 'target', 'near', 'lifeguard.wasm');
-const ATTACKER = '0x000000000000000000000000000000000000dEaD';
 
 async function deploy(owner = L.state().owner || 'lifeguard-kt-mvtu6ag4.testnet') {
   const contract = `lifeguard-${Date.now().toString(36)}.testnet`;
@@ -131,35 +130,17 @@ async function reset(nonce) {
 
 /** Every attempt uses the agent's key. Each must fail, and the output says which layer stopped it. */
 async function redteam() {
-  const s = L.state();
-  const f = await L.fees();
-  const borrow = new ethers.Interface(['function borrow(address,uint256,uint256,uint16,address)'])
-    .encodeFunctionData('borrow', [L.BASE.usdc, 10n ** 9n, 2, 0, s.address]);
-  let agentAcct;
-  const attempts = [
-    ['borrow through owner_action', () => L.call(agentAcct, s.contract, 'owner_action', { id: s.position, to: L.BASE.pool, value: '0', data: borrow, fees: f })],
-    ['borrow as an agent action', () => L.call(agentAcct, s.contract, 'request_action', { id: s.position, action: { Borrow: { asset: L.BASE.usdc, amount: '1000000000' } }, fees: f })],
-    ['withdraw as an agent action', () => L.call(agentAcct, s.contract, 'request_action', { id: s.position, action: { Withdraw: { asset: L.BASE.cbeth, amount: '1' } }, fees: f })],
-    ['approve far above the cap', () => L.call(agentAcct, s.contract, 'request_action', { id: s.position, action: { Approve: { asset: L.BASE.usdc, amount: (10n ** 30n).toString() } }, fees: f })],
-    ['supply an unlisted token', () => L.call(agentAcct, s.contract, 'request_action', { id: s.position, action: { Supply: { asset: ATTACKER, amount: '1' } }, fees: f })],
-    ['drain gas with a huge fee', () => L.call(agentAcct, s.contract, 'request_action', { id: s.position, action: { Repay: { asset: L.BASE.usdc, amount: '1' } }, fees: { ...f, max_fee_per_gas: (10n ** 15n).toString() } })],
-    ['rewind the nonce', () => L.call(agentAcct, s.contract, 'reset_nonce', { id: s.position, nonce: '0' })],
-    ['send the owner\'s NEAR away', async () => {
-      try { await agentAcct.sendMoney('lifeguard-attacker.testnet', 10n ** 22n); return { value: 'sent' }; } catch (e) { return { error: `${e.type || ''} ${e.message}` }; }
-    }],
-  ];
+  const list = L.attacks(L.state(), await L.fees());
   let held = 0;
-  for (const [name, attempt] of attempts) {
-    agentAcct = await L.agentAccount(); // fresh access-key nonce for every attempt
-    const r = await attempt();
-    const layer = /MethodNameMismatch|NotEnoughAllowance|RequiresFullAccess|ReceiverMismatch|access key/i.test(r.error || '') ? 'NEAR access key' : 'Lifeguard contract';
+  for (const { name, run } of list) {
+    const r = await run(await L.agentAccount()); // fresh access-key nonce for every attempt
     const blocked = !!r.error;
     held += blocked;
-    console.log(`${blocked ? 'BLOCKED' : 'ALLOWED'}  ${name.padEnd(30)} ${blocked ? layer.padEnd(18) + ' ' + r.error.replace(/\s+/g, ' ').slice(0, 110) : JSON.stringify(r.value)}`);
-    if (layer === 'Lifeguard contract') console.log(`         failed on chain: ${L.NEAR_EXPLORER}${r.txHash}`); // access-key refusals never reach the chain
+    console.log(`${blocked ? 'BLOCKED' : 'ALLOWED'}  ${name.padEnd(30)} ${blocked ? L.refusedBy(r.error).padEnd(18) + ' ' + r.error.replace(/\s+/g, ' ').slice(0, 110) : JSON.stringify(r.value)}`);
+    if (blocked && L.refusedBy(r.error) === 'Lifeguard contract') console.log(`         failed on chain: ${L.NEAR_EXPLORER}${r.txHash}`); // access-key refusals never reach the chain
   }
-  console.log(`\n${held}/${attempts.length} attacks blocked`);
-  process.exitCode = held === attempts.length ? 0 : 1;
+  console.log(`\n${held}/${list.length} attacks blocked`);
+  process.exitCode = held === list.length ? 0 : 1;
 }
 
 async function status() {

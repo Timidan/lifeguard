@@ -4,7 +4,7 @@ const { ethers } = require('ethers');
 const os = require('os'), path = require('path'), fs = require('fs');
 
 const STATE_FILE = path.join(__dirname, '.keys', 'deployment.json');
-const NEAR_RPC = process.env.NEAR_RPC || 'https://rpc.testnet.near.org';
+const NEAR_RPC = process.env.NEAR_RPC || 'https://test.rpc.fastnear.com'; // the public near.org endpoint takes 3–6 s per call
 const base = new ethers.JsonRpcProvider(process.env.BASE_RPC || 'https://sepolia.base.org');
 const credentials = new keyStores.UnencryptedFileSystemKeyStore(path.join(os.homedir(), '.near-credentials'));
 
@@ -53,8 +53,8 @@ async function call(account, contractId, method, args, { deposit = 0n, gas = 300
   } catch (e) {
     return { txHash, error: e.type ? `${e.type}: ${e.message}` : e.message }; // rejected before execution
   }
-  for (let i = 0; i < 150; i++) {
-    await sleep(2000);
+  for (let i = 0; i < 300; i++) {
+    await sleep(1000);
     let out;
     try { out = await provider.txStatus(txHash, account.accountId, 'FINAL'); } catch { continue; }
     if (out.status.SuccessValue !== undefined) {
@@ -117,4 +117,29 @@ async function account(address) {
   };
 }
 
-module.exports = { BASE, NEAR_EXPLORER, base, call, view, fees, broadcastAndWaitSafe, account, state, save, ownerAccount, agentAccount, credentials, sleep };
+const ATTACKER = '0x000000000000000000000000000000000000dEaD';
+const ATTACK_GAS = 30_000_000_000_000n; // every attack fails before the MPC call, so 30 Tgas is plenty
+
+/** What a compromised agent would try with its key. Each must fail. The CLI red team and the web server both run this list. */
+function attacks(s, f) {
+  const borrow = new ethers.Interface(['function borrow(address,uint256,uint256,uint16,address)'])
+    .encodeFunctionData('borrow', [BASE.usdc, 10n ** 9n, 2, 0, s.address]);
+  const act = (acct, action, fs = f) => call(acct, s.contract, 'request_action', { id: s.position, action, fees: fs }, { gas: ATTACK_GAS });
+  return [
+    { name: 'Borrow through owner_action', detail: 'Borrow 1,000 USDC with a raw Aave call', run: (a) => call(a, s.contract, 'owner_action', { id: s.position, to: BASE.pool, value: '0', data: borrow, fees: f }, { gas: ATTACK_GAS }) },
+    { name: 'Borrow as an agent action', detail: 'Ask the contract for a Borrow action', run: (a) => act(a, { Borrow: { asset: BASE.usdc, amount: '1000000000' } }) },
+    { name: 'Withdraw as an agent action', detail: 'Pull the cbETH collateral out', run: (a) => act(a, { Withdraw: { asset: BASE.cbeth, amount: '1' } }) },
+    { name: 'Approve far above the cap', detail: 'Approve 10^24 USDC to the Pool', run: (a) => act(a, { Approve: { asset: BASE.usdc, amount: (10n ** 30n).toString() } }) },
+    { name: 'Supply an unlisted token', detail: `Supply a token at ${ATTACKER.slice(0, 6)}…${ATTACKER.slice(-4)}`, run: (a) => act(a, { Supply: { asset: ATTACKER, amount: '1' } }) },
+    { name: 'Drain gas with a huge fee', detail: 'Repay 1 unit at 1,000,000 gwei per gas', run: (a) => act(a, { Repay: { asset: BASE.usdc, amount: '1' } }, { ...f, max_fee_per_gas: (10n ** 15n).toString() }) },
+    { name: 'Rewind the nonce', detail: 'Reset the loan\'s nonce to 0', run: (a) => call(a, s.contract, 'reset_nonce', { id: s.position, nonce: '0' }, { gas: ATTACK_GAS }) },
+    { name: 'Send the owner\'s NEAR away', detail: 'Transfer 0.01 NEAR to another account', run: async (a) => {
+      try { await a.sendMoney('lifeguard-attacker.testnet', 10n ** 22n); return { value: 'sent' }; } catch (e) { return { error: `${e.type || ''} ${e.message}`.trim() }; }
+    } },
+  ];
+}
+
+/** Which layer refused a request: NEAR rejects a disallowed access-key use before execution; anything else failed inside the contract. */
+const refusedBy = (error) => (/MethodNameMismatch|NotEnoughAllowance|RequiresFullAccess|ReceiverMismatch|access key/i.test(error) ? 'NEAR access key' : 'Lifeguard contract');
+
+module.exports = { BASE, NEAR_EXPLORER, base, call, view, fees, broadcastAndWaitSafe, account, state, save, ownerAccount, agentAccount, credentials, sleep, attacks, refusedBy };
