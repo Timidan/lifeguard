@@ -5,3 +5,7 @@ target/
 killtests/hf-claim/out/
 killtests/hf-claim/cache/
 .keys/
+backup/
+docs/ideation/
+HACKATHON.md
+PLAN.md
