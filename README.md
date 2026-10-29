@@ -117,8 +117,6 @@ You need Rust, Node 22 and Foundry. None of these steps needs funds.
 - `contract/`: the NEAR contract in Rust (near-sdk 5.30). `src/evm.rs` holds the RLP encoder, the EIP-1559 hashing and the Aave calldata builders.
 - `agent/`: the relayer and red-team CLI (Node, near-api-js 5.1.1, ethers 6.13.4).
 - `killtests/`: the experiments that de-risked the idea before the build (Aave health-factor fork test, Read MPC timing and payload hash, chain-signature broadcast).
-- `docs/ideation/`: how the idea was chosen.
-- `HACKATHON.md`: the rules and gate log.
 
 Libraries: near-sdk, bs58, near-api-js, ethers, forge-std. Code was written with AI coding assistance during the hackathon window.
 
