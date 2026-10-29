@@ -1,0 +1,12 @@
+{
+  "name": "lifeguard-agent",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Relayer, red-team and keeper CLI for the Lifeguard NEAR contract",
+  "main": "cli.js",
+  "bin": { "lifeguard": "cli.js" },
+  "dependencies": {
+    "ethers": "6.13.4",
+    "near-api-js": "5.1.1"
+  }
+}

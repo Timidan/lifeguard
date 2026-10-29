@@ -4,3 +4,4 @@ target/
 *.log
 killtests/hf-claim/out/
 killtests/hf-claim/cache/
+.keys/
