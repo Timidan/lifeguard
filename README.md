@@ -4,10 +4,14 @@
 
 An Aave loan on Base Sepolia, held at an address that NEAR chain signatures control. An agent holding only a NEAR function-call key repaid 1,000 USDC on it:
 
+<!-- evidence:rescue -->
+
 | | Health factor | Debt |
 |---|---|---|
 | Before | 1.079 | $2,088 |
 | After the agent's repay | **2.064** | $1,089 |
+
+<!-- /evidence -->
 
 The same key tried eight ways to hurt the position. All eight were refused.
 
@@ -56,7 +60,9 @@ The contract cannot tell a function-call key from a full-access key: both arrive
 | Read MPC, `verify_foreign_transaction` (domain 3, `Base`, `BlockHash`, `Safe`) | `confirm` / `on_confirmed` | Proves the signed transaction succeeded on Base; reverts are never proven |
 | Yield/resume (inside MPC `sign` and `verify_foreign_transaction`) | promise callbacks | The NEAR call resumes when the MPC network answers (10–22 s measured) |
 | Function-call access keys | `agent/cli.js agent-key` | The agent's key is limited to `request_action` and `confirm` on this contract |
-| Named accounts and cross-contract calls | contract and MPC | `lifeguard-mvtx9n46.testnet` calls `v1.signer-prod.testnet` |
+| Named accounts and cross-contract calls | contract and MPC | The contract's account calls `v1.signer-prod.testnet` |
+
+<!-- evidence:steps -->
 
 ## Evidence (testnet, 29 Oct 2026)
 
@@ -69,6 +75,8 @@ Contract: [`lifeguard-mvtx9n46.testnet`](https://testnet.nearblocks.io/address/l
 | Borrow 2,089 USDC (HF → 1.079) | owner | [BHcH4iJp…](https://testnet.nearblocks.io/txns/BHcH4iJphgwa4CL4e1f1rXA9WwbbmqUwancGwQFzbWfJ) | [0xb5de…2929](https://sepolia.basescan.org/tx/0xb5deadd5e2817c84edce9fe7a13dc664062132ef55f9efb3bfe0051c4b1a2929) | [4UpdrHqR…](https://testnet.nearblocks.io/txns/4UpdrHqRxBvPus9EgHW4fYqHjKu7hye1XCUbYVrJBNa8) |
 | Approve USDC to the Pool | agent | [CdEmmAsA…](https://testnet.nearblocks.io/txns/CdEmmAsA3y6sMtnjTkZk8XcGXJCFKmHXjCTXzjBQVzZP) | [0x8ec2…a3ec](https://sepolia.basescan.org/tx/0x8ec2dedade8068eb6c08ebf461e937090e217b7f91763d437593468b5275a3ec) | [39Fk9xK9…](https://testnet.nearblocks.io/txns/39Fk9xK9uzaWB4LU3vyq8e6RweBAWbjwAqSv5QTkSrRe) |
 | **Repay 1,000 USDC (HF 1.079 → 2.064)** | **agent** | [9vFSDqMV…](https://testnet.nearblocks.io/txns/9vFSDqMVYyLnERM7JEgGQqH3GaLxpXLVxTEkeAAWACgt) | [0xa5b2…63fd](https://sepolia.basescan.org/tx/0xa5b21591aa7a0e683b995726dbce9e87e66ee7ea8c65ca7fb075c4c2057a63fd) | [9kkjiWgJ…](https://testnet.nearblocks.io/txns/9kkjiWgJDc5Z9h7fhAnG8mTTi4S6gKz6mH9uQ3s3bHJV) |
+
+<!-- /evidence -->
 
 Red team, with the agent's real key (`node agent/cli.js redteam`):
 
@@ -87,28 +95,27 @@ Red team, with the agent's real key (`node agent/cli.js redteam`):
 
 You need Rust, Node 22 and Foundry. None of these steps needs funds.
 
-1. **Check the transaction builder against real transactions.** Run `cd contract && cargo test`. You'll see 11 tests pass. Two of them rebuild transactions that NEAR chain signatures signed and Ethereum Sepolia mined, and they match the signing hash and the transaction hash byte for byte. The others check that every disallowed request is refused.
+1. **Check the transaction builder against real transactions.** Run `cd contract && cargo test`. You'll see 11 tests pass. One rebuilds two transactions that NEAR chain signatures signed and Ethereum Sepolia mined, and matches the signing hash and the transaction hash byte for byte. The others check the calldata, the derived address, the proof path and that disallowed requests are refused.
 2. **Check the core safety claim.** Run `cd killtests/hf-claim && forge test -vv`. You'll see 3 tests pass on a fork of Base Sepolia's Aave V3 Pool. Each allowed action, in a healthy state, a liquidatable state and a state below the liquidation threshold, either raises the health factor or reverts.
 3. **Check the rescue on the explorers.** Open the repay row in the evidence table:
    - the NEAR transaction shows `request_action`, then a call to `v1.signer-prod.testnet` `sign`;
-   - the Base transaction shows Aave `repay` from `0x1a37…cfa0`;
+   - the Base transaction shows Aave `repay` from the position's address;
    - the proof transaction shows `confirm`, then `verify_foreign_transaction`, then `on_confirmed` returning `true`.
 4. **Read the position's state on NEAR.** Run `cd agent && npm install && node cli.js status`. You'll see `nonce` 7, the health factor read live from Aave, and the history with `proven: true` on every step. This needs `agent/.keys/deployment.json`; otherwise read `get_position {"id":0}` on the explorer.
 
 ## Run your own
 
 - `cd contract && cargo near build non-reproducible-wasm`
-- `cd agent && npm install && node cli.js deploy <owner.testnet>`. The owner account's key must be in `~/.near-credentials/testnet/`.
-- `node cli.js position`, then `node cli.js agent-key`.
-- Fund the printed Base Sepolia address with a little ETH, then run `node cli.js owner <faucet> <mint calldata>` and `node cli.js agent supply|repay|approve …`.
-- `node cli.js redteam`
+- `cd agent && npm install && node cli.js loop`. It creates a new owner and contract from the testnet faucet, opens a position, gives the agent its key, and prints the position's Base address.
+- Send that address a little Base Sepolia ETH and run `node cli.js loop` again. In about 25 minutes it mints test tokens, supplies cbETH, borrows to a health factor of 1.08, has the agent repay 1,000 USDC, and runs the red team. If it stops part-way, run it again: it picks up from the position's nonce.
+- `node cli.js evidence` rewrites the evidence above and the site's recorded rescue from the chain. Rebuild the site to show it: `cd web && npm run build`.
 
 ## Limitations, by design
 
 - **Testnet only.** NEAR testnet and Base Sepolia, with Aave test tokens. Read MPC and chain signatures work the same way on mainnet; this entry spends no real funds.
 - **Base and Aave V3 only.** E-mode and isolation-mode positions are not covered by the fork test yet.
 - **The owner's full-access key is trusted.** `owner_action` can sign anything. That is the point: the agent's key is not the owner's.
-- **Proofs are slower than signing.** Read MPC is called after Base marks the block `safe` (about 40 s), and the MPC network's view of `safe` can lag. The relayer waits 45 s and retries.
+- **Proofs are slower than signing.** Read MPC is called after Base marks the block `safe`, which took between 30 s and 3.5 minutes when measured, and the MPC network's view of `safe` can lag. The relayer waits 45 s and retries.
 - **A reverted transaction is never proven.** The owner can reset the nonce (`reset_nonce`).
 - **The relayer is a CLI**, not a hosted service. Anyone can relay, because signed transactions and proofs are public.
 

@@ -205,7 +205,7 @@ function Stats({ p }: { p: Position | null }) {
   const stats: [string, string][] = [
     [p ? (hf === null ? 'No debt' : num(hf!, 3)) : '—', 'Health factor now, live'],
     [`${rescue.before} → ${rescue.after}`, `The agent's rescue, ${rescue.date}`],
-    p && p.feed.sent > 0 ? [`${p.feed.refused} / ${p.feed.sent}`, 'Requests refused, every visitor'] : ['8 / 8', 'Attacks refused in the 30 Oct red team'],
+    p && p.feed.sent > 0 ? [`${p.feed.refused} / ${p.feed.sent}`, 'Requests refused, every visitor'] : ['8 / 8', `Attacks refused in the ${rescue.date} red team`],
     [proven !== undefined ? String(proven) : '—', 'Transactions proven by Read MPC'],
   ];
   return (
@@ -286,7 +286,7 @@ export function Landing() {
               ['chain', 'Base · finality Safe'],
               ['tx', short(rescue.baseTx)],
               ['extractor', 'BlockHash'],
-              ['result', '✓ succeeded · nonce 6 → 7', 'safe'],
+              ['result', `✓ succeeded · nonce ${rescue.nonce} → ${rescue.nonce + 1}`, 'safe'],
             ]} />} />
         </div>
       </section>

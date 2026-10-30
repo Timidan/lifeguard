@@ -3,7 +3,7 @@ const { connect, keyStores, transactions, utils, KeyPair } = require('near-api-j
 const { ethers } = require('ethers');
 const os = require('os'), path = require('path'), fs = require('fs');
 
-const STATE_FILE = path.join(__dirname, '.keys', 'deployment.json');
+const STATE_FILE = path.resolve(process.env.LIFEGUARD_STATE || path.join(__dirname, '.keys', 'deployment.json'));
 const NEAR_RPC = process.env.NEAR_RPC || 'https://test.rpc.fastnear.com'; // the public near.org endpoint takes 3–6 s per call
 const base = new ethers.JsonRpcProvider(process.env.BASE_RPC || 'https://sepolia.base.org');
 const credentials = new keyStores.UnencryptedFileSystemKeyStore(path.join(os.homedir(), '.near-credentials'));
@@ -111,7 +111,8 @@ async function account(address) {
     collateralUsd: Number(ethers.formatUnits(d.totalCollateralBase, 8)),
     debtUsd: Number(ethers.formatUnits(d.totalDebtBase, 8)),
     availableBorrowsUsd: Number(ethers.formatUnits(d.availableBorrowsBase, 8)),
-    eth: Number(ethers.formatEther(await base.getBalance(address))),
+    liquidationThreshold: Number(d.currentLiquidationThreshold) / 10000,
+    eth:Number(ethers.formatEther(await base.getBalance(address))),
     usdc: Number(ethers.formatUnits(await erc20(BASE.usdc).balanceOf(address), 6)),
     cbeth: Number(ethers.formatUnits(await erc20(BASE.cbeth).balanceOf(address), 18)),
   };
@@ -142,4 +143,4 @@ function attacks(s, f) {
 /** Which layer refused a request: NEAR rejects a disallowed access-key use before execution; anything else failed inside the contract. */
 const refusedBy = (error) => (/MethodNameMismatch|NotEnoughAllowance|RequiresFullAccess|ReceiverMismatch|access key/i.test(error) ? 'NEAR access key' : 'Lifeguard contract');
 
-module.exports = { BASE, NEAR_EXPLORER, base, call, view, fees, broadcastAndWaitSafe, account, state, save, ownerAccount, agentAccount, credentials, sleep, attacks, refusedBy };
+module.exports = { BASE, NEAR_EXPLORER, base, call, view, fees, broadcastAndWaitSafe, account, state, save, nearConnection, ownerAccount, agentAccount, credentials, sleep, attacks, refusedBy };

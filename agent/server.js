@@ -10,7 +10,7 @@ const DIST = path.join(__dirname, '..', 'web', 'dist');
 const PORT = Number(process.env.PORT || 8740);
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.json': 'application/json', '.woff2': 'font/woff2' };
 
-// One attack costs the agent key about 0.00015 NEAR of its 1 NEAR allowance (measured 30 Oct 2026).
+// One attack costs the agent key about 0.00015 NEAR of its 1 NEAR allowance (measured).
 // ponytail: in-memory limits for one process; they reset on restart.
 const PER_IP_PER_MIN = 20, PER_HOUR = 400;
 const byIp = new Map(); // ip -> timestamps in the last minute

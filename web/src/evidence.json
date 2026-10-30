@@ -2,6 +2,7 @@
   "rescue": {
     "date": "29 Oct 2026",
     "action": "Repay 1,000 USDC",
+    "nonce": 6,
     "before": 1.079,
     "after": 2.064,
     "debtBefore": 2088,
