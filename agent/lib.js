@@ -126,14 +126,14 @@ function attacks(s, f) {
     .encodeFunctionData('borrow', [BASE.usdc, 10n ** 9n, 2, 0, s.address]);
   const act = (acct, action, fs = f) => call(acct, s.contract, 'request_action', { id: s.position, action, fees: fs }, { gas: ATTACK_GAS });
   return [
-    { name: 'Borrow through owner_action', detail: 'Borrow 1,000 USDC with a raw Aave call', run: (a) => call(a, s.contract, 'owner_action', { id: s.position, to: BASE.pool, value: '0', data: borrow, fees: f }, { gas: ATTACK_GAS }) },
-    { name: 'Borrow as an agent action', detail: 'Ask the contract for a Borrow action', run: (a) => act(a, { Borrow: { asset: BASE.usdc, amount: '1000000000' } }) },
-    { name: 'Withdraw as an agent action', detail: 'Pull the cbETH collateral out', run: (a) => act(a, { Withdraw: { asset: BASE.cbeth, amount: '1' } }) },
-    { name: 'Approve far above the cap', detail: 'Approve 10^24 USDC to the Pool', run: (a) => act(a, { Approve: { asset: BASE.usdc, amount: (10n ** 30n).toString() } }) },
-    { name: 'Supply an unlisted token', detail: `Supply a token at ${ATTACKER.slice(0, 6)}…${ATTACKER.slice(-4)}`, run: (a) => act(a, { Supply: { asset: ATTACKER, amount: '1' } }) },
-    { name: 'Drain gas with a huge fee', detail: 'Repay 1 unit at 1,000,000 gwei per gas', run: (a) => act(a, { Repay: { asset: BASE.usdc, amount: '1' } }, { ...f, max_fee_per_gas: (10n ** 15n).toString() }) },
-    { name: 'Rewind the nonce', detail: 'Reset the loan\'s nonce to 0', run: (a) => call(a, s.contract, 'reset_nonce', { id: s.position, nonce: '0' }, { gas: ATTACK_GAS }) },
-    { name: 'Send the owner\'s NEAR away', detail: 'Transfer 0.01 NEAR to another account', run: async (a) => {
+    { name: 'Borrow through owner_action', short: 'Raw borrow call', detail: 'Borrow 1,000 USDC with a raw Aave call', run: (a) => call(a, s.contract, 'owner_action', { id: s.position, to: BASE.pool, value: '0', data: borrow, fees: f }, { gas: ATTACK_GAS }) },
+    { name: 'Borrow as an agent action', short: 'Borrow 1,000 USDC', detail: 'Ask the contract for a Borrow action', run: (a) => act(a, { Borrow: { asset: BASE.usdc, amount: '1000000000' } }) },
+    { name: 'Withdraw as an agent action', short: 'Withdraw collateral', detail: 'Pull the cbETH collateral out', run: (a) => act(a, { Withdraw: { asset: BASE.cbeth, amount: '1' } }) },
+    { name: 'Approve far above the cap', short: 'Approve unlimited', detail: 'Approve 10^24 USDC to the Pool', run: (a) => act(a, { Approve: { asset: BASE.usdc, amount: (10n ** 30n).toString() } }) },
+    { name: 'Supply an unlisted token', short: 'Unlisted token', detail: `Supply a token at ${ATTACKER.slice(0, 6)}…${ATTACKER.slice(-4)}`, run: (a) => act(a, { Supply: { asset: ATTACKER, amount: '1' } }) },
+    { name: 'Drain gas with a huge fee', short: 'Huge gas fee', detail: 'Repay 1 unit at 1,000,000 gwei per gas', run: (a) => act(a, { Repay: { asset: BASE.usdc, amount: '1' } }, { ...f, max_fee_per_gas: (10n ** 15n).toString() }) },
+    { name: 'Rewind the nonce', short: 'Rewind the nonce', detail: 'Reset the loan\'s nonce to 0', run: (a) => call(a, s.contract, 'reset_nonce', { id: s.position, nonce: '0' }, { gas: ATTACK_GAS }) },
+    { name: 'Send the owner\'s NEAR away', short: 'Send NEAR away', detail: 'Transfer 0.01 NEAR to another account', run: async (a) => {
       try { await a.sendMoney('lifeguard-attacker.testnet', 10n ** 22n); return { value: 'sent' }; } catch (e) { return { error: `${e.type || ''} ${e.message}`.trim() }; }
     } },
   ];

@@ -25,6 +25,17 @@ function limited(ip) {
   return false;
 }
 
+// Every attack any visitor sends, so the page can show live totals. Kept on disk across restarts.
+const FEED_FILE = path.join(__dirname, 'data', 'feed.json');
+let feed = fs.existsSync(FEED_FILE) ? JSON.parse(fs.readFileSync(FEED_FILE)) : { sent: 0, refused: 0, recent: [] };
+function record(r) {
+  feed.sent++;
+  if (r.refused) feed.refused++;
+  feed.recent = [{ name: r.name, refused: r.refused, layer: r.layer, tx: r.tx, at: r.at }, ...feed.recent].slice(0, 20);
+  fs.mkdirSync(path.dirname(FEED_FILE), { recursive: true });
+  fs.writeFileSync(FEED_FILE, JSON.stringify(feed));
+}
+
 // Attacks share one access key, so they run one at a time to keep its nonce in order.
 let queue = Promise.resolve();
 const serial = (fn) => (queue = queue.then(fn, fn));
@@ -34,13 +45,15 @@ async function runAttack(i) {
   const attack = list[i];
   const r = await attack.run(await L.agentAccount());
   const layer = r.error ? L.refusedBy(r.error) : null;
-  return {
+  const result = {
     i, name: attack.name, refused: !!r.error, layer,
     error: r.error ? r.error.replace(/\s+/g, ' ').trim() : null,
     tx: layer === 'Lifeguard contract' ? r.txHash : null, // access-key refusals never reach the chain
     value: r.error ? null : r.value,
     at: new Date().toISOString(),
   };
+  record(result);
+  return result;
 }
 
 let cached = { at: 0, body: null };
@@ -59,7 +72,8 @@ async function position() {
     nonce: p.nonce, pending: p.pending.map((x) => x.tx_hash), history: p.history, config,
     key: key.permission.FunctionCall || 'FullAccess',
     loan: { ...loan, healthFactor: Number.isFinite(loan.healthFactor) ? loan.healthFactor : null },
-    attacks: L.attacks(s, {}).map(({ name, detail }) => ({ name, detail })),
+    attacks: L.attacks(s, {}).map(({ name, short, detail }) => ({ name, short, detail })),
+    feed,
     readAt: new Date().toISOString(),
   };
   cached = { at: Date.now(), body };

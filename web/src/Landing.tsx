@@ -1,49 +1,155 @@
 import { useEffect, useState } from 'react';
 import { PixelLogo } from './PixelLogo';
-import { BASE_ADDRESS, BASE_TX, Dot, ExternalLink, NEAR_ACCOUNT, NEAR_TX, num, rescue, short, usePosition, type Position } from './App';
+import { BASE_ADDRESS, BASE_TX, Dot, ExternalLink, NEAR_ACCOUNT, NEAR_TX, num, rescue, sendAttack, short, usePosition, type Position, type Result } from './App';
 
-/** A replay of real testnet requests, line by line, then again. Reduced motion shows every line at once. */
-const REPLAY: { kind: 'ask' | 'no' | 'ok' | 'hf'; text: string }[] = [
-  { kind: 'ask', text: 'borrow 1,000 USDC through owner_action' },
-  { kind: 'no', text: 'refused by the NEAR access key · MethodNameMismatch' },
-  { kind: 'ask', text: 'withdraw the cbETH collateral' },
-  { kind: 'no', text: 'refused by the Lifeguard contract · unknown variant `Withdraw`' },
-  { kind: 'ask', text: 'repay 1,000 USDC' },
-  { kind: 'ok', text: 'signed by NEAR MPC · mined on Base · proven by Read MPC' },
-  { kind: 'hf', text: `health factor ${rescue.before} → ${rescue.after}` },
+/** Where a request goes. A refused one stops at the layer that refused it; the rescue goes all the way. */
+const STAGES = [
+  { label: 'Agent', sub: 'NEAR function-call key' },
+  { label: 'NEAR access key', sub: 'checks what the key may call' },
+  { label: 'Lifeguard contract', sub: 'builds the Base transaction' },
+  { label: 'NEAR MPC', sub: 'chain signature' },
+  { label: 'Aave on Base', sub: 'executes' },
+  { label: 'Read MPC', sub: 'proves it succeeded' },
 ];
+type Stage = 'idle' | 'active' | 'pass' | 'stop' | 'skip';
+type Outcome = { kind: 'repay' } | { kind: 'attack'; name: string; result: Result; ms: number };
+const REPAY = -1; // the recorded rescue, replayed through the same view
+const idle = (): Stage[] => STAGES.map(() => 'idle');
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-function Console() {
+function Pipeline({ states }: { states: Stage[] }) {
+  const node = { idle: 'border-border text-faint', active: 'animate-pulse border-safe/70 text-safe', pass: 'border-safe bg-safe-soft text-safe', stop: 'border-danger bg-danger-soft text-danger', skip: 'border-dashed border-border text-faint opacity-40' };
+  return (
+    <ol className="grid grid-cols-2 gap-x-4 gap-y-5 sm:grid-cols-3 lg:grid-cols-6 lg:gap-x-0">
+      {STAGES.map((s, i) => (
+        <li key={s.label} className="relative flex items-start gap-3 lg:flex-col lg:gap-3 lg:pr-4">
+          {i < STAGES.length - 1 && <span aria-hidden className={`absolute top-[1.125rem] left-11 hidden h-px w-[calc(100%-2.75rem)] transition-colors duration-300 lg:block ${states[i] === 'pass' ? 'bg-safe/60' : 'bg-border'}`} />}
+          <span className={`relative grid size-9 shrink-0 place-items-center rounded-xl border bg-card font-mono text-[0.8125rem] transition-colors duration-300 ${node[states[i]]}`}>
+            {states[i] === 'pass' ? '✓' : states[i] === 'stop' ? '✕' : i + 1}
+          </span>
+          <span className={`min-w-0 transition-opacity duration-300 ${states[i] === 'skip' ? 'opacity-40' : ''}`}>
+            <span className={`block text-[0.875rem] font-medium ${states[i] === 'stop' ? 'text-danger' : ''}`}>{s.label}</span>
+            <span className="block text-[0.75rem] leading-snug text-muted-foreground">{s.sub}</span>
+          </span>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+/** The hero: pick what the agent tries, send it with the agent's real key, and watch where it stops. */
+function LiveConsole({ p }: { p: Position | null }) {
+  const attacks = p?.attacks ?? [];
+  const [pick, setPick] = useState(REPAY);
+  const [states, setStates] = useState<Stage[]>(idle);
+  const [busy, setBusy] = useState(false);
+  const [out, setOut] = useState<Outcome | null>(null);
+  const [extra, setExtra] = useState({ sent: 0, refused: 0 });
   const still = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const [shown, setShown] = useState(still ? REPLAY.length : 0);
-  useEffect(() => {
-    if (still) return;
-    const t = setTimeout(() => setShown((n) => (n > REPLAY.length ? 0 : n + 1)), shown === REPLAY.length ? 6000 : shown === 0 ? 900 : 750);
-    return () => clearTimeout(t);
-  }, [shown, still]);
+
+  async function walk(stopAt: number | null, pace: number) {
+    for (let i = 0; i < STAGES.length; i++) {
+      if (stopAt !== null && i > stopAt) { setStates((st) => st.map((v, j) => (j > stopAt ? 'skip' : v))); return; }
+      setStates((st) => st.map((v, j) => (j === i ? 'active' : v)));
+      if (!still) await sleep(pace);
+      setStates((st) => st.map((v, j) => (j === i ? (i === stopAt ? 'stop' : 'pass') : v)));
+    }
+  }
+
+  async function send(which = pick) {
+    setBusy(true); setOut(null); setStates(idle());
+    if (which === REPAY) {
+      await walk(null, 420);
+      setOut({ kind: 'repay' });
+    } else {
+      setStates((st) => st.map((v, j) => (j === 0 ? 'active' : v)));
+      const t0 = performance.now();
+      const result = await sendAttack(which);
+      const ms = performance.now() - t0;
+      if ('failed' in result) setStates(idle());
+      else {
+        await walk(result.refused ? (result.layer === 'NEAR access key' ? 1 : 2) : 3, 260);
+        setExtra((e) => ({ sent: e.sent + 1, refused: e.refused + (result.refused ? 1 : 0) }));
+      }
+      setOut({ kind: 'attack', name: attacks[which].short, result, ms });
+    }
+    setBusy(false);
+  }
+
+  // Replay the rescue once on arrival, so the outcome is on screen before anyone clicks.
+  useEffect(() => { const t = setTimeout(() => send(REPAY), 1200); return () => clearTimeout(t); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const chip = (selected: boolean) => `tap inline-flex h-8 items-center gap-1.5 rounded-full border px-3.5 text-[0.8125rem] whitespace-nowrap disabled:opacity-60 ${selected ? 'border-foreground bg-foreground font-medium text-background' : 'text-ink-2 hover:border-input hover:text-foreground'}`;
+  const totals = p ? { sent: p.feed.sent + extra.sent, refused: p.feed.refused + extra.refused } : null;
 
   return (
-    <div className="w-full max-w-[40rem] overflow-hidden rounded-2xl border bg-card/90 text-left shadow-[0_30px_80px_-30px_rgb(0_0_0/0.8)] backdrop-blur">
-      <div className="flex items-center gap-3 border-b px-4 py-3">
-        <span className="flex gap-1.5" aria-hidden>{['#ef4444', '#f59e0b', '#22c55e'].map((c) => <span key={c} className="size-2 rounded-full" style={{ background: c }} />)}</span>
-        <span className="font-mono text-[0.75rem] text-muted-foreground">agent console · replay of real testnet requests</span>
+    <div id="console" className="w-full max-w-[66rem] scroll-mt-24 overflow-hidden rounded-3xl border bg-card/95 text-left shadow-[0_40px_120px_-40px_rgb(16_185_129/0.25)] backdrop-blur">
+      <div className="flex items-center justify-between gap-3 border-b px-5 py-3">
+        <span className="flex items-center gap-3">
+          <span className="flex gap-1.5" aria-hidden>{['#ef4444', '#f59e0b', '#22c55e'].map((c) => <span key={c} className="size-2 rounded-full" style={{ background: c }} />)}</span>
+          <span className="font-mono text-[0.75rem] text-muted-foreground">agent console</span>
+        </span>
+        <span className="flex items-center gap-2 font-mono text-[0.6875rem] tracking-[0.12em] text-muted-foreground uppercase"><Dot className="animate-pulse text-safe" />Live · NEAR testnet</span>
       </div>
-      <div className="min-h-[15.5rem] space-y-1.5 px-5 py-4 font-mono text-[0.8125rem] leading-relaxed" aria-label="Replay: the agent tries to borrow and withdraw and is refused twice, then repays and the health factor rises from 1.079 to 2.064">
-        {REPLAY.slice(0, shown).map((l, i) => (
-          <div key={i} className="animate-line">
-            {l.kind === 'ask' && <><span className="text-safe">agent ›</span> <span className="text-foreground">{l.text}</span></>}
-            {l.kind === 'no' && <span className="pl-4 text-danger">✕ {l.text}</span>}
-            {l.kind === 'ok' && <span className="pl-4 text-safe">✓ {l.text}</span>}
-            {l.kind === 'hf' && <span className="pl-4 text-white">{l.text}</span>}
+
+      <div className="space-y-6 p-5 sm:p-7">
+        <div>
+          <div className="label-mono">What the agent tries</div>
+          <div role="radiogroup" aria-label="Request" className="mt-3 flex flex-wrap gap-2">
+            <button type="button" role="radio" aria-checked={pick === REPAY} disabled={busy} onClick={() => setPick(REPAY)} className={chip(pick === REPAY)}>
+              Repay 1,000 USDC <span className={`font-mono text-[0.6875rem] ${pick === REPAY ? 'text-background/70' : 'text-safe'}`}>recorded</span>
+            </button>
+            {attacks.map((a, i) => (
+              <button key={a.name} type="button" role="radio" aria-checked={pick === i} title={a.detail} disabled={busy} onClick={() => setPick(i)} className={chip(pick === i)}>{a.short}</button>
+            ))}
           </div>
-        ))}
-        {shown < REPLAY.length && <span aria-hidden className="inline-block h-4 w-2 animate-pulse bg-ink-2 align-middle" />}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-4">
+          <button type="button" onClick={() => send()} disabled={busy || (pick !== REPAY && !attacks.length)}
+            className="tap inline-flex h-11 items-center gap-2 rounded-full bg-safe px-6 text-[0.875rem] font-semibold text-background hover:opacity-90 disabled:cursor-wait disabled:opacity-60">
+            {busy && <span aria-hidden className="size-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />}
+            {pick === REPAY ? 'Replay the rescue' : busy ? 'Sending…' : "Send with the agent's key"}
+          </button>
+          <span className="text-[0.8125rem] text-muted-foreground">{pick === REPAY ? `Recorded on testnet, ${rescue.date}.` : 'Sent live to NEAR testnet with the real key. The server holds it, not your browser.'}</span>
+        </div>
+
+        <div className="rounded-2xl border bg-background/60 p-5"><Pipeline states={states} /></div>
+
+        <div className="min-h-[5.5rem]" aria-live="polite">
+          {!out && <p className="text-[0.875rem] text-muted-foreground">{busy ? (pick === REPAY ? 'Replaying the recorded rescue…' : "Sending with the agent's key…") : 'Pick a request and send it.'}</p>}
+          {out?.kind === 'repay' && (
+            <div className="animate-line space-y-2">
+              <p className="text-[0.9375rem]"><span className="text-safe">✓ Signed, executed and proven.</span> <span className="text-ink-2">Health factor</span> <span className="tnum font-mono text-white">{rescue.before} → {rescue.after}</span></p>
+              <p className="flex flex-wrap gap-x-4 gap-y-1 text-[0.8125rem] text-muted-foreground">
+                <ExternalLink href={NEAR_TX + rescue.nearSign}>Signed on NEAR</ExternalLink>
+                <ExternalLink href={BASE_TX + rescue.baseTx}>Mined on Base</ExternalLink>
+                <ExternalLink href={NEAR_TX + rescue.nearProof}>Proven by Read MPC</ExternalLink>
+              </p>
+            </div>
+          )}
+          {out?.kind === 'attack' && ('failed' in out.result ? (
+            <p className="animate-line text-[0.875rem] text-wait">Not sent: {out.result.failed}</p>
+          ) : (
+            <div className="animate-line space-y-2.5">
+              <p className="text-[0.9375rem]">
+                {out.result.refused
+                  ? <><span className="text-danger">✕ {out.name}: refused by the {out.result.layer}.</span> <span className="text-safe">The loan wasn't touched.</span></>
+                  : <span className="text-danger">The contract signed “{out.name}”. This should never happen.</span>}
+              </p>
+              {out.result.error && <p className="rounded-lg border bg-background px-3 py-2 font-mono text-[0.75rem] leading-relaxed text-ink-2">{out.result.error}</p>}
+              <p className="flex flex-wrap gap-x-4 gap-y-1 text-[0.8125rem] text-muted-foreground">
+                {out.result.tx ? <ExternalLink href={NEAR_TX + out.result.tx}>Failed transaction on NEAR</ExternalLink> : <span>Rejected before it reached the chain</span>}
+                <span className="tnum">{(out.ms / 1000).toFixed(1)} s</span>
+              </p>
+            </div>
+          ))}
+        </div>
       </div>
-      <div className="flex flex-wrap gap-x-4 gap-y-1 border-t px-5 py-3 text-[0.8125rem] text-muted-foreground">
-        <span>The repay:</span>
-        <ExternalLink href={NEAR_TX + rescue.nearSign}>signed on NEAR</ExternalLink>
-        <ExternalLink href={BASE_TX + rescue.baseTx}>mined on Base</ExternalLink>
-        <ExternalLink href={NEAR_TX + rescue.nearProof}>proven by Read MPC</ExternalLink>
+
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t px-5 py-3 text-[0.8125rem] text-muted-foreground">
+        <span className="tnum">{totals && totals.sent > 0 ? `${totals.refused} of ${totals.sent} requests refused, from every visitor so far` : 'Every request any visitor sends is counted here.'}</span>
+        <a href="/app" className="underline decoration-input underline-offset-4 hover:text-foreground">All eight at once, the loan and the logbook</a>
       </div>
     </div>
   );
@@ -98,7 +204,7 @@ function Stats({ p }: { p: Position | null }) {
   const stats: [string, string][] = [
     [p ? (hf === null ? 'No debt' : num(hf!, 3)) : '—', 'Health factor now, live'],
     [`${rescue.before} → ${rescue.after}`, `The agent's rescue, ${rescue.date}`],
-    ['8 / 8', 'Attacks refused in the 30 Oct red team'],
+    p && p.feed.sent > 0 ? [`${p.feed.refused} / ${p.feed.sent}`, 'Requests refused, every visitor'] : ['8 / 8', 'Attacks refused in the 30 Oct red team'],
     [proven !== undefined ? String(proven) : '—', 'Transactions proven by Read MPC'],
   ];
   return (
@@ -126,7 +232,7 @@ export function Landing() {
         <div aria-hidden className="grid-lines pointer-events-none absolute inset-0 [mask-image:radial-gradient(ellipse_80%_70%_at_50%_45%,black_10%,transparent_65%)]" />
         <div aria-hidden className="pointer-events-none absolute top-1/3 left-1/2 h-[28rem] w-[46rem] -translate-x-1/2 rounded-full bg-safe/[0.06] blur-3xl" />
         <div className="relative flex flex-col items-center">
-          <div {...rise(0)}><PixelLogo cell={11} /></div>
+          <div {...rise(0)}><PixelLogo cell={9} /></div>
           <div {...rise(1)} className="mt-10 animate-rise font-mono text-[0.6875rem] tracking-[0.3em] text-safe uppercase">AI agent security · enforced by NEAR</div>
           <h1 {...rise(2)} className="mt-6 max-w-[16ch] animate-rise text-[2.75rem] leading-[1.04] font-bold tracking-[-0.04em] sm:text-[4.25rem]">
             It can rescue your loan. <em className="font-serif font-normal text-ink-2">It can never sink it.</em>
@@ -135,10 +241,10 @@ export function Landing() {
             Lifeguard: an AI agent that can rescue your loan on any chain but can never put it at risk, enforced by NEAR.
           </p>
           <div {...rise(4)} className="mt-9 flex animate-rise flex-wrap justify-center gap-3">
-            <a href="/app" className="tap rounded-full bg-safe px-8 py-3.5 text-[0.875rem] font-semibold text-background hover:opacity-90">Launch app</a>
+            <a href="#console" className="tap rounded-full bg-safe px-8 py-3.5 text-[0.875rem] font-semibold text-background hover:opacity-90">Attack the agent</a>
             <a href="#how" className="tap rounded-full border px-8 py-3.5 text-[0.875rem] font-medium text-ink-2 hover:border-input hover:text-foreground">How it works</a>
           </div>
-          <div {...rise(5)} className="mt-14 flex w-full animate-rise justify-center"><Console /></div>
+          <div {...rise(5)} className="mt-14 flex w-full animate-rise justify-center"><LiveConsole p={p} /></div>
           <div {...rise(6)} className="mt-10 flex animate-rise items-center gap-2 font-mono text-[0.6875rem] tracking-[0.12em] text-faint uppercase">
             <Dot className="text-safe" />Live on NEAR testnet · Base Sepolia · built for NEAR HACKATHON
           </div>

@@ -8,10 +8,22 @@ export type Position = {
   config: { mpc: string; chain_id: string; pool: string; assets: { address: string; approve_cap: string }[]; max_fee_per_gas: string; max_priority_fee_per_gas: string; max_gas_limit: string; max_actions_per_day: number };
   key: { receiver_id: string; method_names: string[]; allowance: string | null } | 'FullAccess';
   loan: { healthFactor: number | null; debtUsd: number; collateralUsd: number };
-  attacks: { name: string; detail: string }[];
+  attacks: { name: string; short: string; detail: string }[];
+  feed: { sent: number; refused: number };
   readAt: string;
 };
-type Result = { refused: boolean; layer: string | null; error: string | null; tx: string | null } | { failed: string };
+export type Result = { refused: boolean; layer: string | null; error: string | null; tx: string | null } | { failed: string };
+
+/** Sends attack i with the agent's real key, through the Lifeguard server. Never throws. */
+export async function sendAttack(i: number): Promise<Result> {
+  try {
+    const res = await fetch(`/api/attack/${i}`, { method: 'POST' });
+    const body = await res.json();
+    return res.ok ? body : { failed: body.error ?? `The server answered ${res.status}.` };
+  } catch {
+    return { failed: "Can't reach the Lifeguard server." };
+  }
+}
 
 export const NEAR_TX = 'https://testnet.nearblocks.io/txns/';
 export const NEAR_ACCOUNT = 'https://testnet.nearblocks.io/address/';
@@ -221,14 +233,7 @@ function AttackPanel({ p, aside }: { p: Position | null; aside: React.ReactNode 
   const run = useCallback(async (i: number) => {
     setRunning((s) => new Set(s).add(i));
     setResults(({ [i]: _, ...rest }) => rest);
-    let result: Result;
-    try {
-      const res = await fetch(`/api/attack/${i}`, { method: 'POST' });
-      const body = await res.json();
-      result = res.ok ? body : { failed: body.error ?? `The server answered ${res.status}.` };
-    } catch {
-      result = { failed: "Can't reach the Lifeguard server." };
-    }
+    const result = await sendAttack(i);
     setResults((r) => ({ ...r, [i]: result }));
     setRunning((s) => { const n = new Set(s); n.delete(i); return n; });
   }, []);
