@@ -44,7 +44,8 @@ function LiveConsole({ p }: { p: Position | null }) {
   const [states, setStates] = useState<Stage[]>(idle);
   const [busy, setBusy] = useState(false);
   const [out, setOut] = useState<Outcome | null>(null);
-  const [extra, setExtra] = useState({ sent: 0, refused: 0 });
+  const [extra, setExtra] = useState({ sent: 0, refused: 0 }); // this visitor's attacks since the last feed refresh
+  useEffect(() => setExtra({ sent: 0, refused: 0 }), [p?.feed.sent]);
   const still = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   async function walk(stopAt: number | null, pace: number) {
@@ -120,7 +121,7 @@ function LiveConsole({ p }: { p: Position | null }) {
           {!out && <p className="text-[0.875rem] text-muted-foreground">{busy ? (pick === REPAY ? 'Replaying the recorded rescue…' : "Sending with the agent's key…") : 'Pick a request and send it.'}</p>}
           {out?.kind === 'repay' && (
             <div className="animate-line space-y-2">
-              <p className="text-[0.9375rem]"><span className="text-safe">✓ Signed, executed and proven.</span> <span className="text-ink-2">Health factor</span> <span className="tnum font-mono text-white">{rescue.before} → {rescue.after}</span></p>
+              <p className="text-[0.9375rem]"><span className="text-safe">✓ Signed, executed and proven on {rescue.date}.</span> <span className="text-ink-2">Health factor</span> <span className="tnum font-mono text-white">{rescue.before} → {rescue.after}</span></p>
               <p className="flex flex-wrap gap-x-4 gap-y-1 text-[0.8125rem] text-muted-foreground">
                 <ExternalLink href={NEAR_TX + rescue.nearSign}>Signed on NEAR</ExternalLink>
                 <ExternalLink href={BASE_TX + rescue.baseTx}>Mined on Base</ExternalLink>
