@@ -8,8 +8,8 @@ An Aave loan on Base Sepolia, held at an address that NEAR chain signatures cont
 
 | | Health factor | Debt |
 |---|---|---|
-| Before | 1.079 | $2,088 |
-| After the agent's repay | **2.064** | $1,089 |
+| Before | 1.081 | $2,023 |
+| After the agent's repay | **2.137** | $1,023 |
 
 <!-- /evidence -->
 
@@ -64,17 +64,19 @@ The contract cannot tell a function-call key from a full-access key: both arrive
 
 <!-- evidence:steps -->
 
-## Evidence (testnet, 29 Oct 2026)
+## Evidence (testnet, 1 Nov 2026)
 
-Contract: [`lifeguard-mvtx9n46.testnet`](https://testnet.nearblocks.io/address/lifeguard-mvtx9n46.testnet). Position 0's Base address: [`0x1a373d9b5676d82b5dd743cae2a4759bcd92cfa0`](https://sepolia.basescan.org/address/0x1a373d9b5676d82b5dd743cae2a4759bcd92cfa0).
+Contract: [`lifeguard-mvxuworb.testnet`](https://testnet.nearblocks.io/address/lifeguard-mvxuworb.testnet). Position 0's Base address: [`0xd6cab70b6781f8d79a2dbb7d94ef37b6128cb719`](https://sepolia.basescan.org/address/0xd6cab70b6781f8d79a2dbb7d94ef37b6128cb719).
 
 | Step | Who | Signed by NEAR | Mined on Base | Proven by Read MPC |
 |---|---|---|---|---|
-| Approve cbETH to the Pool | agent | [264d9e4h…](https://testnet.nearblocks.io/txns/264d9e4ha6hYu9Vb9jWiaEkxcznGUz3BDHbgELYr5pmX) | [0xe476…6559](https://sepolia.basescan.org/tx/0xe4762abaef1f04783353d7e45ece1637cbc93a3c0a22d578ee1039cf67066559) | [9bWHenL5…](https://testnet.nearblocks.io/txns/9bWHenL5tXAr3xvNDZBnfrJr5BFso1cuW5PBybfAjVnA) |
-| Supply 1 cbETH | agent | [7sP1NVq3…](https://testnet.nearblocks.io/txns/7sP1NVq3vHF8DzUS6oVRbnt6hi5kYsYZbrxxW2R7pESC) | [0xfde0…f443](https://sepolia.basescan.org/tx/0xfde05646c65ebe4ac24a58d74e6598f61726d80a50b8823ce92ae2f431fbf443) | [9BiV8qXD…](https://testnet.nearblocks.io/txns/9BiV8qXDCqCWzzfMRoo5CMmeHiLvomM9Z3aRS1JSSQcP) |
-| Borrow 2,089 USDC (HF → 1.079) | owner | [BHcH4iJp…](https://testnet.nearblocks.io/txns/BHcH4iJphgwa4CL4e1f1rXA9WwbbmqUwancGwQFzbWfJ) | [0xb5de…2929](https://sepolia.basescan.org/tx/0xb5deadd5e2817c84edce9fe7a13dc664062132ef55f9efb3bfe0051c4b1a2929) | [4UpdrHqR…](https://testnet.nearblocks.io/txns/4UpdrHqRxBvPus9EgHW4fYqHjKu7hye1XCUbYVrJBNa8) |
-| Approve USDC to the Pool | agent | [CdEmmAsA…](https://testnet.nearblocks.io/txns/CdEmmAsA3y6sMtnjTkZk8XcGXJCFKmHXjCTXzjBQVzZP) | [0x8ec2…a3ec](https://sepolia.basescan.org/tx/0x8ec2dedade8068eb6c08ebf461e937090e217b7f91763d437593468b5275a3ec) | [39Fk9xK9…](https://testnet.nearblocks.io/txns/39Fk9xK9uzaWB4LU3vyq8e6RweBAWbjwAqSv5QTkSrRe) |
-| **Repay 1,000 USDC (HF 1.079 → 2.064)** | **agent** | [9vFSDqMV…](https://testnet.nearblocks.io/txns/9vFSDqMVYyLnERM7JEgGQqH3GaLxpXLVxTEkeAAWACgt) | [0xa5b2…63fd](https://sepolia.basescan.org/tx/0xa5b21591aa7a0e683b995726dbce9e87e66ee7ea8c65ca7fb075c4c2057a63fd) | [9kkjiWgJ…](https://testnet.nearblocks.io/txns/9kkjiWgJDc5Z9h7fhAnG8mTTi4S6gKz6mH9uQ3s3bHJV) |
+| Mint 1 cbETH | owner | [4r9zN8fw…](https://testnet.nearblocks.io/txns/4r9zN8fwMMj7TWYJYT2QPXdAaxHQkh6S1cRPxZDkwJtM) | [0x795c…9990](https://sepolia.basescan.org/tx/0x795c1ded9b035ecace64e3f3699fc48b3a5ae4e7e1f0496e451d6fdcf8509990) | [Fs4PCt2M…](https://testnet.nearblocks.io/txns/Fs4PCt2M4ygZbxmYbfAe5UcLqn3drLAR1VawntRdBQtF) |
+| Mint 1,000 USDC | owner | [ESUrZqtT…](https://testnet.nearblocks.io/txns/ESUrZqtTVqSQRpendHxKfD4N2kEfMDhvzbnJNCtar1VD) | [0x5a6d…551c](https://sepolia.basescan.org/tx/0x5a6d70c14aed02aff494c623583999576460cec98259dd5875ef5e5972c1551c) | [EHhadJZ4…](https://testnet.nearblocks.io/txns/EHhadJZ4QQPAdvnAYmi25qxLs1fAQWXWvKZ6XBRV1F4H) |
+| Approve cbETH to the Pool | agent | [3idNyGw5…](https://testnet.nearblocks.io/txns/3idNyGw5KUB36mKafUQvTD3NqwXnorbHj8XCpyFBy4ui) | [0xc504…0061](https://sepolia.basescan.org/tx/0xc504b3d9d2410ce22b29bbca26769af5d75e2e7cf5162703481768dfb22d0061) | [6UV84mkY…](https://testnet.nearblocks.io/txns/6UV84mkYj96UATXHQvWV5d6fiVkoN7uvMoQRLwGr1FLp) |
+| Supply 1 cbETH | agent | [5Urxad9K…](https://testnet.nearblocks.io/txns/5Urxad9KBdK9CYzLohhw23ssjZd9212wNYB8EGDoTQ9p) | [0xc5f7…0962](https://sepolia.basescan.org/tx/0xc5f7c300763f37ad5ad7efd220950456708b01b539e20634defb3d64c29a0962) | [FjbFAgG6…](https://testnet.nearblocks.io/txns/FjbFAgG6gQUfCTxDbYz2GuJEkZ9Uz6iiFtDrGGCrczvi) |
+| Borrow 2,023 USDC (HF → 1.081) | owner | [BHdZk6wj…](https://testnet.nearblocks.io/txns/BHdZk6wjvyuAgm3itFghi4EgwcuCAhtAejenyMWasv3p) | [0xbf2b…ff7b](https://sepolia.basescan.org/tx/0xbf2b0b12578655e940475659b6aad2f4a9670ce959254816cecd513c93f0ff7b) | [CPM2kyBW…](https://testnet.nearblocks.io/txns/CPM2kyBWq5NyN7ny9WE3nVfu1dgpzeXjqARrHzgdG7Dj) |
+| Approve USDC to the Pool | agent | [HYcqupxd…](https://testnet.nearblocks.io/txns/HYcqupxdca7qDRHtiFQSb5iZsG7TBJgR5kj7ASd73uMv) | [0x251f…e352](https://sepolia.basescan.org/tx/0x251f188b8fdfb78e45be3cdc5a4acf2be87d7a1577bbda7c911b88ce7d7ce352) | [93GDtzCq…](https://testnet.nearblocks.io/txns/93GDtzCqmzLTagqNsxGrorQokJHucVR1pp3i7HKSgftk) |
+| **Repay 1,000 USDC (HF 1.081 → 2.137)** | **agent** | [7SLhiw7E…](https://testnet.nearblocks.io/txns/7SLhiw7EHzLyXAkEvkhucWau8A2mahbgpXUBsrT9tyEg) | [0xbe1c…9984](https://sepolia.basescan.org/tx/0xbe1c57d14f562fe77741a20d9c55c3fe4234f8b9f215cf41c3a95870529c9984) | [6tK8vGgy…](https://testnet.nearblocks.io/txns/6tK8vGgy6R7YPVjfoRRXgyMSHPzDeSV7jpDS8znuch96) |
 
 <!-- /evidence -->
 
