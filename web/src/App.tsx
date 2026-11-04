@@ -384,10 +384,10 @@ function OwnerApp() {
           </article>
           <article aria-labelledby="mcp-heading" className="min-w-0 p-5 sm:p-7"><h3 id="mcp-heading" className="text-2xl">Your own agent, over MCP</h3>
             <ol className="mt-5 space-y-5">
-              <li><p>1. Create a key. This prints its public key.</p><Command value={p ? `node agent/mcp.js init ${p.position}` : null} /></li>
+              <li><p>1. Create a key. This prints its public key.</p><Command value={p ? `node agent/mcp.js init ${p.position} ${p.contract}` : null} /></li>
               <li><label htmlFor="agent-key">2. Give that public key access.</label><input id="agent-key" className="mt-2 min-h-11 w-full rounded-md border border-input bg-background px-3 font-mono text-sm" placeholder="ed25519:…" value={ownKey} onChange={event => setOwnKey(event.target.value)} disabled={!p} spellCheck={false} autoComplete="off" />
                 <button className={button + ' mt-3'} disabled={actionsDisabled || !ownKey.trim() || ownKeyGiven} onClick={() => void act('Give a key', async () => { await wallet!.addKey(p!.contract, ownKey.trim()); setOwnKey(''); await load(); })}>{ownKeyGiven ? 'Key given' : 'Give it a key'}</button></li>
-              <li><p>3. Connect your MCP client.</p><Command value={p ? `claude mcp add lifeguard -e LIFEGUARD_STATE=~/.lifeguard/${p.contract}-${p.position}.json -- node agent/mcp.js` : null} /></li>
+              <li><p>3. Connect your MCP client.</p><Command value={p ? `claude mcp add lifeguard -e LIFEGUARD_STATE=$HOME/.lifeguard/${p.contract}-${p.position}.json -- node agent/mcp.js` : null} /></li>
             </ol>
           </article>
         </div>

@@ -2,7 +2,7 @@
 // Lifeguard web server: serves web/dist, reads loans live, relays the setup steps owners sign in their wallets,
 // and lets a visitor fire the red-team attacks with the agent's real key. The key stays in agent/.keys; the browser only ever gets results.
 //
-//   node server.js            PORT (default 8740)
+//   node server.js            PORT (default 8740), HOST (default 127.0.0.1)
 const http = require('http'), fs = require('fs'), path = require('path');
 const L = require('./lib');
 const { ethers } = require('ethers');
@@ -132,14 +132,14 @@ async function step(id, name, query) {
 // After the owner signs, anyone may broadcast the Base transaction and ask Read MPC to confirm it. The server does both.
 // ponytail: jobs live in memory; a restart drops them, and the page simply asks again.
 const relays = new Map();
-let confirms = Promise.resolve(); // one relayer key, so confirmations go one at a time
+let confirms = Promise.resolve(); // confirmations go one at a time
 function relay(id) {
   const running = relays.get(id);
   if (running && !['done', 'reverted', 'failed'].includes(running.state)) return running;
   const job = { state: 'starting', tx: null, error: null };
   relays.set(id, job);
   const done = (async () => {
-    const t = (await L.view('get_position', { id })).pending[0];
+    const pos = await L.view('get_position', { id }), t = pos.pending[0];
     if (!t) return (job.state = 'done');
     Object.assign(job, { state: 'mining', tx: t.tx_hash });
     await L.base.broadcastTransaction(t.raw).catch(() => {}); // already sent or mined is fine
@@ -150,7 +150,8 @@ function relay(id) {
     job.state = 'confirming';
     await L.sleep(30000); // Read MPC's view of `safe` lags the public RPC
     for (let i = 0; i < 5; i++) {
-      const confirm = () => L.ownerAccount().then((a) => L.call(a, S.contract, 'confirm', { id, tx_hash: t.tx_hash }));
+      // Lifeguard's key on the owner's account may call confirm, so the server never holds a full-access key.
+      const confirm = () => L.agentAccount(pos.owner).then((a) => L.call(a, S.contract, 'confirm', { id, tx_hash: t.tx_hash }));
       const r = await (confirms = confirms.then(confirm, confirm));
       const still = (await L.view('get_position', { id })).pending.some((x) => x.tx_hash === t.tx_hash);
       if (r.value === true || !still) { cache.delete(id); return Object.assign(job, { state: 'done', nearProof: r.txHash }); }
@@ -267,4 +268,4 @@ http.createServer(async (req, res) => {
   } catch (e) {
     send(res, e.status || 502, { error: e.status ? e.message : `Testnet RPC error: ${e.message}` });
   }
-}).listen(PORT, '127.0.0.1', () => console.log(`Lifeguard on http://127.0.0.1:${PORT}; Base gas wallet ${drip.address}`));
+}).listen(PORT, process.env.HOST || '127.0.0.1', () => console.log(`Lifeguard on port ${PORT}; Base gas wallet ${drip.address}`));

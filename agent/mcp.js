@@ -2,7 +2,7 @@
 // Lifeguard MCP server: lets any MCP client (Claude Code, Cursor, a NEAR AI agent) act on one loan with the agent's
 // NEAR function-call key. The tools are a convenience; NEAR's access key and the Lifeguard contract decide what runs.
 //
-//   node mcp.js init <position> [contract]   make an agent key for a position; prints the public key to grant
+//   node mcp.js init <position> <contract>   make an agent key for a position; prints the public key to grant
 //   node mcp.js                              serve MCP over stdio (LIFEGUARD_STATE picks the loan, as in cli.js)
 console.log = (...a) => console.error(...a); // stdout carries only MCP messages
 const fs = require('fs'), os = require('os'), path = require('path');
@@ -100,7 +100,7 @@ const TOOLS = [
 
 function init(position, contract = L.state().contract) {
   return (async () => {
-    if (!/^\d+$/.test(position ?? '')) throw new Error('usage: node mcp.js init <position> [contract]');
+    if (!/^\d+$/.test(position ?? '') || !contract) throw new Error('usage: node mcp.js init <position> <contract>');
     const near = await L.nearConnection();
     const p = await (await near.account(contract)).viewFunction({ contractId: contract, methodName: 'get_position', args: { id: Number(position) } });
     if (!p) throw new Error(`No position ${position} on ${contract}`);

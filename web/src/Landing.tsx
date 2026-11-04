@@ -38,7 +38,7 @@ export function Landing() {
               An AI agent that can rescue your loan <em className="block text-safe">and can never put it at risk.</em>
             </h1>
             <p className="mt-5 max-w-[34rem] text-[1.125rem] leading-relaxed text-muted-foreground">
-              It works on any chain, and NEAR enforces every limit instead of trusting the agent.
+              It repays your Aave loan on Base when it nears liquidation, and NEAR enforces every limit instead of trusting the agent.
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-3">
               <a href="#how" className="tap rounded-md bg-safe px-7 py-3.5 text-[0.9375rem] font-semibold text-background hover:opacity-90">Attack the agent</a>

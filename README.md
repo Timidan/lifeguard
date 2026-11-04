@@ -1,6 +1,6 @@
 # Lifeguard
 
-**Lifeguard: an AI agent that can rescue your loan on any chain but can never put it at risk, enforced by NEAR.**
+**Lifeguard: an AI agent that can rescue your Aave loan but can never put it at risk, enforced by NEAR.**
 
 An Aave loan on Base Sepolia, held at an address that NEAR chain signatures control. An agent holding only a NEAR function-call key repaid 1,000 USDC on it:
 
@@ -30,7 +30,24 @@ The model's decision was signed inside its enclave. To check it: `cd agent && no
 
 The same key tried eight ways to hurt the position. All eight were refused.
 
-Built for NEAR HACKATHON (tracks: AI Security & Defense, Agent Economy, Unstoppable DeFi). Every line of code was written during the hackathon window.
+Built for NEAR HACKATHON (tracks: AI Security & Defense, Unstoppable DeFi, Agent Economy). Work started on 29 Oct 2026; the rules count code written from the 19 Oct announcement. All the evidence on this page was recorded inside the 1–14 Nov window.
+
+## Use it
+
+Open **https://lifeguard.timidan.xyz** (NEAR testnet and Base Sepolia; no real funds).
+
+1. **Attack the agent.** On [the test loan](https://lifeguard.timidan.xyz/app?position=0), press *Send with the agent's key* on any of the eight attacks. You'll see which layer refused it, the exact error, and the failed transaction on NEAR. The server sends each attack with the agent's real key.
+2. **Protect a loan of your own.** On [the app](https://lifeguard.timidan.xyz/app), connect a NEAR testnet wallet (Meteor or MyNEARWallet).
+   - *Open loan*: one approval of 0.05 NEAR. It creates your position and gives Lifeguard's agent a key that can only call `request_action` and `confirm`.
+   - The server then funds Base gas, gets 1 test cbETH and has the agent supply it. That takes about 10 minutes, mostly waiting for Base to mark blocks `safe` and for Read MPC to confirm each step.
+   - *Borrow 1,000 USDC*: one more approval. The agent then approves USDC for repayments, and the card shows your health factor.
+   - *Borrow until the health factor is 1.2*: you push the loan into danger yourself. Within a few minutes the keeper sees it below 1.25, asks a model on NEAR AI how much to repay, and repays; the health factor goes back up and the repay appears under Activity, verified by Read MPC.
+3. **Use your own agent over MCP.** Once your loan is ready, the app shows these steps with your position filled in:
+   ```sh
+   git clone https://github.com/Timidan/lifeguard && cd lifeguard/agent && npm install && cd ..
+   node agent/mcp.js init <position> lifeguard-mvxuworb.testnet   # prints a public key
+   ```
+   Paste that key into *Give it a key* in the app (one wallet approval), then add the server to your client, for example `claude mcp add lifeguard -e LIFEGUARD_STATE=$HOME/.lifeguard/lifeguard-mvxuworb.testnet-<position>.json -- node agent/mcp.js`. Ask it for `get_loan`, then to repay 100 USDC: it signs through the contract and you get the NEAR, Base and Read MPC links. Ask it to borrow or withdraw with `near_call`: NEAR's access key or the contract refuses it, and the tool returns which layer refused and the failed transaction.
 
 ## The problem
 
@@ -108,7 +125,7 @@ Red team, with the agent's real key (`node agent/cli.js redteam`):
 | Rewind the nonce | NEAR access key | `MethodNameMismatch: … reset_nonce isn't allowed` |
 | Send the owner's NEAR away | NEAR access key | `RequiresFullAccess` |
 
-## Try it
+## Check it yourself
 
 You need Rust, Node 22 and Foundry. None of these steps needs funds.
 
@@ -118,7 +135,7 @@ You need Rust, Node 22 and Foundry. None of these steps needs funds.
    - the NEAR transaction shows `request_action`, then a call to `v1.signer-prod.testnet` `sign`;
    - the Base transaction shows Aave `repay` from the position's address;
    - the proof transaction shows `confirm`, then `verify_foreign_transaction`, then `on_confirmed` returning `true`.
-4. **Read the position's state on NEAR.** Run `cd agent && npm install && node cli.js status`. You'll see `nonce` 7, the health factor read live from Aave, and the history with `proven: true` on every step. This needs `agent/.keys/deployment.json`; otherwise read `get_position {"id":0}` on the explorer.
+4. **Read the position's state on NEAR.** Run `cd agent && npm install && node cli.js status`. You'll see the position's `nonce`, its health factor from Aave, and the history with `proven: true` on every step. This needs `agent/.keys/deployment.json`; otherwise read `get_position {"id":0}` on the explorer.
 
 ## Run your own
 
@@ -134,15 +151,22 @@ You need Rust, Node 22 and Foundry. None of these steps needs funds.
 - **The owner's full-access key is trusted.** `owner_action` can sign anything. That is the point: the agent's key is not the owner's.
 - **Proofs are slower than signing.** Read MPC is called after Base marks the block `safe`, which took between 30 s and 3.5 minutes when measured, and the MPC network's view of `safe` can lag. The relayer waits 45 s and retries.
 - **A reverted transaction is never proven.** The owner can reset the nonce (`reset_nonce`).
-- **The relayer is a CLI**, not a hosted service. Anyone can relay, because signed transactions and proofs are public.
+- **The model sizes the repay; it does not decide what is allowed.** The keeper's rule triggers below health factor 1.25 and computes the amount to reach 1.9; the model on NEAR AI only adds a buffer of 0 to 25%, and a bad answer falls back to the rule. The contract still checks every action.
+- **One relayer.** The hosted server broadcasts transactions and asks Read MPC to confirm them, and the keeper serves positions one after another. Anyone can relay, because signed transactions and proofs are public.
+- **If you revoke Lifeguard's key**, the keeper stops serving your loan and the server can no longer confirm for it; your own agent or the CLI can still call `confirm`.
 
 ## Repository
 
 - `contract/`: the NEAR contract in Rust (near-sdk 5.30). `src/evm.rs` holds the RLP encoder, the EIP-1559 hashing and the Aave calldata builders.
-- `agent/`: the relayer and red-team CLI (Node, near-api-js 5.1.1, ethers 6.13.4).
-- `web/`: the landing page and the app (Vite + React). The app lets a visitor fire the eight red-team attacks with the agent's real key and see which layer refused each one. Build it with `cd web && npm install && npm run build`, then run `node agent/server.js` and open `http://127.0.0.1:8740`. The server holds the agent's key; the browser never sees it.
+- `agent/`: Node, near-api-js 5.1.1, ethers 6.13.4.
+  - `server.js`: the site's API. It prepares the transactions your wallet signs, runs the loan setup with Lifeguard's key, relays and confirms, and sends the eight attacks.
+  - `keeper.js`: watches every position that gave Lifeguard its key and repays below health factor 1.25. `node keeper.check.js` tests its rule.
+  - `mcp.js`: the MCP server for your own agent.
+  - `verify-decision.js`: checks the enclave signature on a saved model decision.
+  - `cli.js`: deploy, the full scripted loop, the red team and the evidence writer.
+- `web/`: the landing page and the app (Vite + React, NEAR Wallet Selector). Build it with `cd web && npm install && npm run build`, then run `node agent/server.js` and open `http://127.0.0.1:8740`. The server holds Lifeguard's key; the browser never sees it.
 - `killtests/`: the experiments that de-risked the idea before the build (Aave health-factor fork test, Read MPC timing and payload hash, chain-signature broadcast).
 
-Libraries: near-sdk, bs58, near-api-js, ethers, forge-std. Code was written with AI coding assistance during the hackathon window.
+Libraries: near-sdk, bs58, near-api-js, ethers, NEAR Wallet Selector, React, Vite, Tailwind, forge-std. Code was written with AI coding assistance, from 29 Oct 2026.
 
 License: MIT.
