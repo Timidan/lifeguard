@@ -266,8 +266,10 @@ async function evidence() {
   const a = s.autonomous;
   const day = new Date(a.confirmedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
   const span = (Date.parse(a.confirmedAt) - Date.parse(a.decidedAt)) / 1000;
+  const amount = a.amount.toLocaleString('en-US', { maximumFractionDigits: 2 });
   blocks.autonomous = [
-    `Then, with nobody touching it, on ${day}: \`agent/keeper.js\` saw health factor ${hf(a.before)}, asked \`${a.model}\` on NEAR AI how much to repay, and repaid ${a.amount.toLocaleString('en-US')} USDC through the same contract in ${Math.floor(span / 60)} min ${Math.round(span % 60)} s.`, '',
+    `Then on ${day}, the owner of position ${a.position} borrowed until its health factor was ${hf(a.before)}. From there nobody touched it: \`agent/keeper.js\` asked \`${a.model}\` on NEAR AI how much to repay, and repaid ${amount} USDC through the same contract in ${Math.floor(span / 60)} min ${Math.round(span % 60)} s.`, '',
+    `The model's reason: “${a.reason}”`, '',
     '| | Health factor | Debt |', '|---|---|---|',
     `| Before | ${hf(a.before)} | ${usd(a.before.debtUsd)} |`,
     `| After the keeper's repay | **${hf(a.after)}** | ${usd(a.after.debtUsd)} |`, '',
@@ -276,9 +278,9 @@ async function evidence() {
   ];
   const readme = fs.readFileSync(README, 'utf8').replace(/(<!-- evidence:(\w+) -->\n\n)[\s\S]*?(\n\n<!-- \/evidence -->)/g, (_, open, name, close) => open + blocks[name].join('\n') + close);
   fs.writeFileSync(README, readme);
-  const latest = (await L.view('get_position', { id: s.position })).history.find((e) => e.tx_hash === a.baseTx);
+  const latest = (await L.view('get_position', { id: a.position })).history.find((e) => e.tx_hash === a.baseTx);
   fs.writeFileSync(SITE_EVIDENCE, `${JSON.stringify({ rescue: {
-    date: day, action: `Repay ${a.amount.toLocaleString('en-US')} USDC`, nonce: Number(latest.nonce),
+    date: day, action: `Repay ${amount} USDC`, nonce: Number(latest.nonce),
     before: Number(hf(a.before)), after: Number(hf(a.after)), debtBefore: Math.round(a.before.debtUsd), debtAfter: Math.round(a.after.debtUsd),
     nearSign: a.nearSign, baseTx: a.baseTx, nearProof: a.nearProof,
   } }, null, 2)}\n`);

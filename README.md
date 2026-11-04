@@ -15,16 +15,18 @@ An Aave loan on Base Sepolia, held at an address that NEAR chain signatures cont
 
 <!-- evidence:autonomous -->
 
-Then, with nobody touching it, on 2 Nov 2026: `agent/keeper.js` saw health factor 1.119, asked `z-ai/glm-5.3-flash` on NEAR AI how much to repay, and repaid 1,000 USDC through the same contract in 3 min 40 s.
+Then on 4 Nov 2026, the owner of position 1 borrowed until its health factor was 1.200. From there nobody touched it: `agent/keeper.js` asked `z-ai/glm-5.3-flash` on NEAR AI how much to repay, and repaid 722.86 USDC through the same contract in 3 min 7 s.
+
+The model's reason: “The current health factor is 1.20, but the recent readings were flat at 3.381 until a sudden drop to 1.2002 over the last readings; since the readings have now stabilized at 1.2002 and are not falling further, no buffer is needed on top of toReachTarget.”
 
 | | Health factor | Debt |
 |---|---|---|
-| Before | 1.119 | $1,972 |
-| After the keeper's repay | **2.269** | $973 |
+| Before | 1.200 | $1,963 |
+| After the keeper's repay | **1.900** | $1,240 |
 
-[Signed by NEAR](https://testnet.nearblocks.io/txns/4HG5yznzx6QYQs72UGM1M738H1LaCMpNFXmfKeECaawQ) · [mined on Base](https://sepolia.basescan.org/tx/0xa215b56918dfe25bc939ef00820e7451dfd572b2322f3604c08e20244023510a) · [confirmed by Read MPC](https://testnet.nearblocks.io/txns/58LLyAtncWQvgjzeYNKok1Et8sYAGv9KwJb1Zc2HdUet)
+[Signed by NEAR](https://testnet.nearblocks.io/txns/HMbFNLX62posPVDpRCnJ65i4QKd6hHETty5BEKrjDLBJ) · [mined on Base](https://sepolia.basescan.org/tx/0x13c64e83f085db6d25a3f15ce4089c7755f47063e0b4a33789453ba164c10554) · [confirmed by Read MPC](https://testnet.nearblocks.io/txns/HfKeMv3xQKNo4U83J3PT8nZkhPTvemaKVypCcopYQaJX)
 
-The model's decision was signed inside its enclave. To check it: `cd agent && node verify-decision.js decisions/f4e83f302f824c848b4b960a4e394188.json`
+The model's decision was signed inside its enclave. To check it: `cd agent && node verify-decision.js decisions/22220087fb4048bd91df3cfa4495f657.json`
 
 <!-- /evidence -->
 
