@@ -13,6 +13,21 @@ An Aave loan on Base Sepolia, held at an address that NEAR chain signatures cont
 
 <!-- /evidence -->
 
+<!-- evidence:autonomous -->
+
+Then, with nobody touching it, on 2 Nov 2026: `agent/keeper.js` saw health factor 1.119, asked `z-ai/glm-5.3-flash` on NEAR AI how much to repay, and repaid 1,000 USDC through the same contract in 3 min 40 s.
+
+| | Health factor | Debt |
+|---|---|---|
+| Before | 1.119 | $1,972 |
+| After the keeper's repay | **2.269** | $973 |
+
+[Signed by NEAR](https://testnet.nearblocks.io/txns/4HG5yznzx6QYQs72UGM1M738H1LaCMpNFXmfKeECaawQ) · [mined on Base](https://sepolia.basescan.org/tx/0xa215b56918dfe25bc939ef00820e7451dfd572b2322f3604c08e20244023510a) · [confirmed by Read MPC](https://testnet.nearblocks.io/txns/58LLyAtncWQvgjzeYNKok1Et8sYAGv9KwJb1Zc2HdUet)
+
+The model's decision was signed inside its enclave. To check it: `cd agent && node verify-decision.js decisions/f4e83f302f824c848b4b960a4e394188.json`
+
+<!-- /evidence -->
+
 The same key tried eight ways to hurt the position. All eight were refused.
 
 Built for NEAR HACKATHON (tracks: AI Security & Defense, Agent Economy, Unstoppable DeFi). Every line of code was written during the hackathon window.

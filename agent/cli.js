@@ -263,14 +263,26 @@ async function evidence() {
       ...rows,
     ],
   };
+  const a = s.autonomous;
+  const day = new Date(a.confirmedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+  const span = (Date.parse(a.confirmedAt) - Date.parse(a.decidedAt)) / 1000;
+  blocks.autonomous = [
+    `Then, with nobody touching it, on ${day}: \`agent/keeper.js\` saw health factor ${hf(a.before)}, asked \`${a.model}\` on NEAR AI how much to repay, and repaid ${a.amount.toLocaleString('en-US')} USDC through the same contract in ${Math.floor(span / 60)} min ${Math.round(span % 60)} s.`, '',
+    '| | Health factor | Debt |', '|---|---|---|',
+    `| Before | ${hf(a.before)} | ${usd(a.before.debtUsd)} |`,
+    `| After the keeper's repay | **${hf(a.after)}** | ${usd(a.after.debtUsd)} |`, '',
+    `[Signed by NEAR](${L.NEAR_EXPLORER}${a.nearSign}) · [mined on Base](${L.BASE.explorer}${a.baseTx}) · [confirmed by Read MPC](${L.NEAR_EXPLORER}${a.nearProof})`, '',
+    `The model's decision was signed inside its enclave. To check it: \`cd agent && node verify-decision.js decisions/${a.modelChat}.json\``,
+  ];
   const readme = fs.readFileSync(README, 'utf8').replace(/(<!-- evidence:(\w+) -->\n\n)[\s\S]*?(\n\n<!-- \/evidence -->)/g, (_, open, name, close) => open + blocks[name].join('\n') + close);
   fs.writeFileSync(README, readme);
+  const latest = (await L.view('get_position', { id: s.position })).history.find((e) => e.tx_hash === a.baseTx);
   fs.writeFileSync(SITE_EVIDENCE, `${JSON.stringify({ rescue: {
-    date, action: 'Repay 1,000 USDC', nonce: Number(repay.nonce),
-    before: Number(hf(s.before)), after: Number(hf(s.after)), debtBefore: Math.round(s.before.debtUsd), debtAfter: Math.round(s.after.debtUsd),
-    nearSign: s.txs[repay.tx_hash].nearSign, baseTx: repay.tx_hash, nearProof: s.txs[repay.tx_hash].nearProof,
+    date: day, action: `Repay ${a.amount.toLocaleString('en-US')} USDC`, nonce: Number(latest.nonce),
+    before: Number(hf(a.before)), after: Number(hf(a.after)), debtBefore: Math.round(a.before.debtUsd), debtAfter: Math.round(a.after.debtUsd),
+    nearSign: a.nearSign, baseTx: a.baseTx, nearProof: a.nearProof,
   } }, null, 2)}\n`);
-  console.log(`README and ${path.basename(SITE_EVIDENCE)} now show ${s.contract}, ${date}: HF ${hf(s.before)} → ${hf(s.after)}`);
+  console.log(`README and ${path.basename(SITE_EVIDENCE)} now show ${s.contract}, ${day}: HF ${hf(a.before)} → ${hf(a.after)}`);
 }
 
 // By hand, a command first proves any earlier mined transaction, because the nonce advances only on a proof. `loop` does this itself between steps.

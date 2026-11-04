@@ -1,10 +1,15 @@
 #!/usr/bin/env node
-// Lifeguard web server: serves web/dist, reads the loan live, and lets a visitor fire the red-team attacks with
-// the agent's real key. The key stays in agent/.keys; the browser only ever gets results.
+// Lifeguard web server: serves web/dist, reads loans live, relays the setup steps owners sign in their wallets,
+// and lets a visitor fire the red-team attacks with the agent's real key. The key stays in agent/.keys; the browser only ever gets results.
 //
 //   node server.js            PORT (default 8740)
 const http = require('http'), fs = require('fs'), path = require('path');
 const L = require('./lib');
+const { ethers } = require('ethers');
+
+const S = L.state(); // the demo deployment: its contract hosts every position, and its owner relays Read MPC confirmations
+const TGAS = 1_000_000_000_000n;
+const iface = new ethers.Interface(['function mint(address,address,uint256)', 'function borrow(address,uint256,uint256,uint16,address)']);
 
 const DIST = path.join(__dirname, '..', 'web', 'dist');
 const PORT = Number(process.env.PORT || 8740);
@@ -56,28 +61,169 @@ async function runAttack(i) {
   return result;
 }
 
-let cached = { at: 0, body: null };
-async function position() {
-  if (Date.now() - cached.at < 8000) return cached.body;
-  const s = L.state();
+const cache = new Map();
+async function position(id = S.position) {
+  const hit = cache.get(id);
+  if (hit && Date.now() - hit.at < 8000) return { ...hit.body, relay: relays.get(id) || null, setup: setups.get(id) || null };
+  const p = await L.view('get_position', { id });
+  if (!p) return null;
   const provider = (await L.ownerAccount()).connection.provider;
-  const [p, config, key] = await Promise.all([
-    L.view('get_position', { id: s.position }),
+  const [config, keys, loan] = await Promise.all([
     L.view('get_config'),
-    provider.query({ request_type: 'view_access_key', finality: 'final', account_id: s.owner, public_key: s.agentPublicKey }),
+    provider.query({ request_type: 'view_access_key_list', finality: 'final', account_id: p.owner }),
+    p.address ? L.account(p.address) : null,
   ]);
-  const loan = await L.account(p.address);
+  // Function-call keys the owner has given agents for this contract.
+  const agents = keys.keys.filter((k) => k.access_key.permission.FunctionCall?.receiver_id === S.contract).map((k) => ({
+    publicKey: k.public_key, methods: k.access_key.permission.FunctionCall.method_names,
+    allowance: k.access_key.permission.FunctionCall.allowance, keeper: k.public_key === S.agentPublicKey,
+  }));
+  const keeper = keys.keys.find((k) => k.public_key === S.agentPublicKey);
   const body = {
-    contract: s.contract, owner: s.owner, position: s.position, address: p.address, agentPublicKey: s.agentPublicKey,
-    nonce: p.nonce, pending: p.pending.map((x) => x.tx_hash), history: p.history, config,
-    key: key.permission.FunctionCall || 'FullAccess',
-    loan: { ...loan, healthFactor: Number.isFinite(loan.healthFactor) ? loan.healthFactor : null },
-    attacks: L.attacks(s, {}).map(({ name, short, detail }) => ({ name, short, detail })),
+    contract: S.contract, owner: p.owner, position: id, address: p.address, agentPublicKey: S.agentPublicKey,
+    nonce: p.nonce, pending: p.pending.map((x) => x.tx_hash), history: p.history, config, agents,
+    key: keeper?.access_key.permission.FunctionCall || 'FullAccess',
+    loan: loan && { ...loan, healthFactor: Number.isFinite(loan.healthFactor) ? loan.healthFactor : null },
+    attacks: L.attacks(S, {}).map(({ name, short, detail }) => ({ name, short, detail })),
     feed,
     readAt: new Date().toISOString(),
   };
-  cached = { at: Date.now(), body };
-  return body;
+  cache.set(id, { at: Date.now(), body });
+  return { ...body, relay: relays.get(id) || null, setup: setups.get(id) || null };
+}
+
+// Owners never change, so the list of positions only grows: each call reads only the ids past the last one known.
+const owners = [];
+async function positionsOf(owner) {
+  for (let id = owners.length; ; id++) { const p = await L.view('get_position', { id }); if (!p) break; owners[id] = p.owner; } // by index: overlapping calls write the same values
+  const provider = (await L.ownerAccount()).connection.provider;
+  const keeperKey = await provider.query({ request_type: 'view_access_key', finality: 'final', account_id: owner, public_key: S.agentPublicKey }).then(() => true, () => false);
+  return { positions: owners.flatMap((o, id) => (o === owner ? [id] : [])), keeperKey, keeperPublicKey: S.agentPublicKey, contract: S.contract };
+}
+
+/** The NEAR transaction an owner signs in their wallet for each setup step. */
+async function step(id, name, query) {
+  if (name === 'open') return { receiverId: S.contract, method: 'create_position', args: {}, gas: String(100n * TGAS), deposit: String(5n * 10n ** 22n) };
+  const p = await L.view('get_position', { id });
+  if (!p?.address) throw Object.assign(new Error('No such position'), { status: 404 });
+  const usdc = Math.round(Number(query.get('usdc') || 1000));
+  if (!(usdc >= 1 && usdc <= 100000)) throw Object.assign(new Error('usdc must be 1 to 100,000'), { status: 400 });
+  const owner = async (to, data, gas) => ['owner_action', { id, to, value: '0', data, fees: await L.fees(gas) }];
+  const agent = async (kind, asset, amount, gas) => ['request_action', { id, action: { [kind]: { asset, amount: String(amount) } }, fees: await L.fees(gas) }];
+  const steps = {
+    mint: () => owner(L.BASE.faucet, iface.encodeFunctionData('mint', [L.BASE.cbeth, p.address, 10n ** 18n]), 200000),
+    approveCollateral: () => agent('Approve', L.BASE.cbeth, 10n ** 18n, 100000),
+    supply: () => agent('Supply', L.BASE.cbeth, 10n ** 18n, 400000),
+    borrow: () => owner(L.BASE.pool, iface.encodeFunctionData('borrow', [L.BASE.usdc, BigInt(usdc) * 10n ** 6n, 2, 0, p.address]), 500000),
+    approveRepay: () => agent('Approve', L.BASE.usdc, 10000n * 10n ** 6n, 100000),
+    // Borrows just enough to take the health factor to 1.2, under the agent's 1.25 trigger, so an owner can watch a rescue.
+    risk: async () => {
+      const a = await L.account(p.address);
+      const more = Math.floor(a.debtUsd * (a.healthFactor / 1.2 - 1));
+      if (!(more >= 1) || more > a.availableBorrowsUsd) throw Object.assign(new Error('This loan is already at or below 1.2'), { status: 409 });
+      return owner(L.BASE.pool, iface.encodeFunctionData('borrow', [L.BASE.usdc, BigInt(more) * 10n ** 6n, 2, 0, p.address]), 500000);
+    },
+  };
+  if (!steps[name]) throw Object.assign(new Error('No such step'), { status: 404 });
+  const [method, args] = await steps[name]();
+  return { receiverId: S.contract, method, args, gas: String(300n * TGAS), deposit: '0' };
+}
+
+// After the owner signs, anyone may broadcast the Base transaction and ask Read MPC to confirm it. The server does both.
+// ponytail: jobs live in memory; a restart drops them, and the page simply asks again.
+const relays = new Map();
+let confirms = Promise.resolve(); // one relayer key, so confirmations go one at a time
+function relay(id) {
+  const running = relays.get(id);
+  if (running && !['done', 'reverted', 'failed'].includes(running.state)) return running;
+  const job = { state: 'starting', tx: null, error: null };
+  relays.set(id, job);
+  const done = (async () => {
+    const t = (await L.view('get_position', { id })).pending[0];
+    if (!t) return (job.state = 'done');
+    Object.assign(job, { state: 'mining', tx: t.tx_hash });
+    await L.base.broadcastTransaction(t.raw).catch(() => {}); // already sent or mined is fine
+    const receipt = await L.base.waitForTransaction(t.tx_hash, 1, 240000);
+    if (receipt.status !== 1) return (job.state = 'reverted');
+    job.state = 'safe';
+    for (;;) { const safe = await L.base.getBlock('safe'); if (safe && safe.number >= receipt.blockNumber) break; await L.sleep(4000); }
+    job.state = 'confirming';
+    await L.sleep(30000); // Read MPC's view of `safe` lags the public RPC
+    for (let i = 0; i < 5; i++) {
+      const confirm = () => L.ownerAccount().then((a) => L.call(a, S.contract, 'confirm', { id, tx_hash: t.tx_hash }));
+      const r = await (confirms = confirms.then(confirm, confirm));
+      const still = (await L.view('get_position', { id })).pending.some((x) => x.tx_hash === t.tx_hash);
+      if (r.value === true || !still) { cache.delete(id); return Object.assign(job, { state: 'done', nearProof: r.txHash }); }
+      await L.sleep(20000);
+    }
+    throw new Error('Read MPC has not verified it yet');
+  })().catch((e) => Object.assign(job, { state: 'failed', error: e.message })).then(() => job);
+  return Object.defineProperty(job, 'done', { value: done }); // awaitable, and left out of the JSON
+}
+
+// A new loan address has no ETH for Base gas. Each position gets a little once, from a testnet-only wallet.
+const DRIP_FILE = path.join(__dirname, '.keys', 'base-drip');
+if (!fs.existsSync(DRIP_FILE)) fs.writeFileSync(DRIP_FILE, ethers.Wallet.createRandom().privateKey, { mode: 0o600 });
+const drip = new ethers.Wallet(fs.readFileSync(DRIP_FILE, 'utf8').trim(), L.base);
+const GAS_FILE = path.join(__dirname, 'data', 'gas.json');
+let drips = Promise.resolve();
+async function gas(id) {
+  const p = await L.view('get_position', { id });
+  if (!p?.address) throw Object.assign(new Error('No such position'), { status: 404 });
+  if ((await L.base.getBalance(p.address)) >= ethers.parseEther('0.0001')) return { tx: null };
+  const given = fs.existsSync(GAS_FILE) ? JSON.parse(fs.readFileSync(GAS_FILE)) : [];
+  if (given.includes(id)) throw Object.assign(new Error('This loan already got gas once.'), { status: 409 });
+  const send = async () => (await drip.sendTransaction({ to: p.address, value: ethers.parseEther('0.0003') })).wait();
+  const receipt = await (drips = drips.then(send, send));
+  fs.mkdirSync(path.dirname(GAS_FILE), { recursive: true });
+  fs.writeFileSync(GAS_FILE, JSON.stringify([...given, id]));
+  cache.delete(id);
+  return { tx: receipt.hash };
+}
+
+// Aave's test faucet mints to anyone, so test collateral needs no signature from the owner.
+const faucet = new ethers.Contract(L.BASE.faucet, ['function mint(address,address,uint256) returns (uint256)'], drip);
+const mintTest = (to) => { const send = async () => (await faucet.mint(L.BASE.cbeth, to, 10n ** 18n)).wait(); return (drips = drips.then(send, send)); };
+
+// Every setup step that isn't the owner's: Base gas and test cbETH from the testnet wallet, then the collateral through
+// Lifeguard's agent key, which may only supply, repay and approve. Borrowing stays the owner's. Each call works out the
+// next step from the chain, so it is safe to call again at any time; it stops when the owner has to borrow.
+const setups = new Map();
+function setup(id) {
+  const running = setups.get(id);
+  if (running?.state === 'working') return running;
+  const job = { state: 'working', step: null, error: null };
+  setups.set(id, job);
+  (async () => {
+    for (let i = 0; i < 12; i++) {
+      const p = await L.view('get_position', { id });
+      if (!p?.address) throw new Error('This position has no Base address yet.');
+      if (p.pending.length) {
+        job.step = 'confirm';
+        const r = await relay(id).done;
+        if (r.state !== 'done') throw new Error(r.error || `The Base transaction ${r.state}.`);
+        continue;
+      }
+      const a = await L.account(p.address);
+      const agent = (step, kind, asset, amount, gasLimit) => async () => {
+        job.step = step;
+        const r = await L.call(await L.agentAccount(p.owner), S.contract, 'request_action', { id, action: { [kind]: { asset, amount: String(amount) } }, fees: await L.fees(gasLimit) });
+        if (r.error) throw new Error(/KeyNotFound/.test(r.error) ? "Lifeguard's agent has no key for this account yet." : r.error);
+      };
+      const next = a.eth < 0.0001 ? async () => { job.step = 'gas'; await gas(id); }
+        : a.cbeth < 1 && a.collateralUsd === 0 ? async () => { job.step = 'mint'; await mintTest(p.address); }
+        : a.collateralUsd === 0 && a.cbethAllowance < 1 ? agent('approveCollateral', 'Approve', L.BASE.cbeth, 10n ** 18n, 100000)
+        : a.collateralUsd === 0 ? agent('supply', 'Supply', L.BASE.cbeth, 10n ** 18n, 400000)
+        : a.debtUsd === 0 ? null
+        : a.usdcAllowance === 0 ? agent('approveRepay', 'Approve', L.BASE.usdc, 10000n * 10n ** 6n, 100000)
+        : null;
+      if (!next) return Object.assign(job, { state: a.debtUsd === 0 ? 'waiting' : 'done', step: a.debtUsd === 0 ? 'borrow' : null });
+      await next();
+      cache.delete(id);
+    }
+    throw new Error('Setup did not finish.');
+  })().catch((e) => Object.assign(job, { state: 'failed', error: e.message }));
+  return job;
 }
 
 function send(res, status, body, type = 'application/json') {
@@ -97,7 +243,17 @@ function serveStatic(req, res) {
 
 http.createServer(async (req, res) => {
   try {
-    if (req.method === 'GET' && req.url === '/api/position') return send(res, 200, await position());
+    const u = new URL(req.url, 'http://x');
+    const id = (v) => (/^\d+$/.test(v ?? '') ? Number(v) : null);
+    if (req.method === 'GET' && u.pathname === '/api/position') {
+      const body = await position(u.searchParams.has('id') ? id(u.searchParams.get('id')) ?? -1 : S.position);
+      return body ? send(res, 200, body) : send(res, 404, { error: 'No such position' });
+    }
+    if (req.method === 'GET' && u.pathname === '/api/positions') return send(res, 200, { owner: u.searchParams.get('owner'), ...(await positionsOf(u.searchParams.get('owner'))) });
+    let r = u.pathname.match(/^\/api\/step\/(new|\d+)\/(\w+)$/);
+    if (r && req.method === 'GET') return send(res, 200, await step(id(r[1]), r[2], u.searchParams));
+    r = u.pathname.match(/^\/api\/(relay|gas|setup)\/(\d+)$/);
+    if (r && req.method === 'POST') return send(res, 200, r[1] === 'relay' ? relay(Number(r[2])) : r[1] === 'setup' ? setup(Number(r[2])) : await gas(Number(r[2])));
     const m = req.url.match(/^\/api\/attack\/(\d)$/);
     if (m && req.method === 'POST') {
       const i = Number(m[1]);
@@ -109,6 +265,6 @@ http.createServer(async (req, res) => {
     if (req.url.startsWith('/api/')) return send(res, 404, { error: 'Not found' });
     serveStatic(req, res);
   } catch (e) {
-    send(res, 502, { error: `Testnet RPC error: ${e.message}` });
+    send(res, e.status || 502, { error: e.status ? e.message : `Testnet RPC error: ${e.message}` });
   }
-}).listen(PORT, '127.0.0.1', () => console.log(`Lifeguard on http://127.0.0.1:${PORT}`));
+}).listen(PORT, '127.0.0.1', () => console.log(`Lifeguard on http://127.0.0.1:${PORT}; Base gas wallet ${drip.address}`));

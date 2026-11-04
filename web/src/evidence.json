@@ -1,14 +1,14 @@
 {
   "rescue": {
-    "date": "1 Nov 2026",
+    "date": "2 Nov 2026",
     "action": "Repay 1,000 USDC",
-    "nonce": 6,
-    "before": 1.081,
-    "after": 2.137,
-    "debtBefore": 2023,
-    "debtAfter": 1023,
-    "nearSign": "7SLhiw7EHzLyXAkEvkhucWau8A2mahbgpXUBsrT9tyEg",
-    "baseTx": "0xbe1c57d14f562fe77741a20d9c55c3fe4234f8b9f215cf41c3a95870529c9984",
-    "nearProof": "6tK8vGgy6R7YPVjfoRRXgyMSHPzDeSV7jpDS8znuch96"
+    "nonce": 8,
+    "before": 1.119,
+    "after": 2.269,
+    "debtBefore": 1972,
+    "debtAfter": 973,
+    "nearSign": "4HG5yznzx6QYQs72UGM1M738H1LaCMpNFXmfKeECaawQ",
+    "baseTx": "0xa215b56918dfe25bc939ef00820e7451dfd572b2322f3604c08e20244023510a",
+    "nearProof": "58LLyAtncWQvgjzeYNKok1Et8sYAGv9KwJb1Zc2HdUet"
   }
 }

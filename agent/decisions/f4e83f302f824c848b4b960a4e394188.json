@@ -1,0 +1,12 @@
+{
+  "model": "z-ai/glm-5.3-flash",
+  "request": "{\"model\":\"z-ai/glm-5.3-flash\",\"stream\":false,\"max_tokens\":400,\"reasoning_effort\":\"none\",\"messages\":[{\"role\":\"system\",\"content\":\"You are the agent for one Aave loan. Its health factor is below the rescue trigger, so you must repay debt now.\\nChoose how much USDC to repay. Repaying x USDC multiplies the health factor by debt / (debt - x). Liquidation happens at 1.0.\\nAim for the target health factor. Repay more when recent readings are falling fast, and keep some USDC in reserve when they are calm.\\nNever exceed the USDC balance. Reply with JSON only.\"},{\"role\":\"user\",\"content\":\"{\\\"healthFactor\\\":1.1189073407488246,\\\"debtUsd\\\":1972.34850424,\\\"usdcBalance\\\":2973,\\\"targetHealthFactor\\\":1.9,\\\"recentHealthFactors\\\":[1.1189]}\"}],\"response_format\":{\"type\":\"json_schema\",\"json_schema\":{\"name\":\"repay\",\"strict\":true,\"schema\":{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"amount_usdc\",\"reason\"],\"properties\":{\"amount_usdc\":{\"type\":\"number\"},\"reason\":{\"type\":\"string\"}}}}}}",
+  "response": "{\"id\":\"f4e83f302f824c848b4b960a4e394188\",\"object\":\"chat.completion\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"{ \\\"amount_usdc\\\": 1000, \\\"reason\\\": \\\"Recent HFs\\\" }\"},\"finish_reason\":\"stop\",\"logprobs\":null,\"matched_stop\":154827}],\"model\":\"z-ai/glm-5.3-flash\",\"created\":1793628222,\"usage\":{\"prompt_tokens\":173,\"total_tokens\":193,\"completion_tokens\":20,\"prompt_tokens_details\":null,\"reasoning_tokens\":0,\"completion_tokens_details\":{\"reasoning_tokens\":0}}}",
+  "signature": {
+    "text": "z-ai/glm-5.3-flash:7a877726096aaebdbb74bd8b9bb2ab9c99e8c571b6180250d357967d642431e4:9b3cff71f697f8a2447e5dae7b511f3dea3f1cc7c896508438a09f93ea3fa793",
+    "signature": "0x24b6e09e76bb968e61c6876ea8debe4b17260a7e64787eac868d6af1a18af5f92c2e4a3560631b8b6cc8be734544989e1b0e71aed9424f0c46f2e525a0d4721a1b",
+    "signing_address": "0x3b753b4406613c5e70ae640508632b600424fa0c",
+    "signing_algo": "ecdsa",
+    "signature_kind": "provider_tee"
+  }
+}

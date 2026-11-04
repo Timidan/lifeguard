@@ -29,11 +29,10 @@ const nearConnection = (keyStore = credentials) => connect({ networkId: 'testnet
 const ownerAccount = async () => (await nearConnection()).account(state().owner);
 
 /** The agent signs as the owner's account, but only with its function-call key. */
-async function agentAccount() {
-  const s = state();
+async function agentAccount(owner = state().owner) {
   const keyStore = new keyStores.InMemoryKeyStore();
-  await keyStore.setKey('testnet', s.owner, KeyPair.fromString(s.agentKey));
-  return (await nearConnection(keyStore)).account(s.owner);
+  await keyStore.setKey('testnet', owner, KeyPair.fromString(state().agentKey));
+  return (await nearConnection(keyStore)).account(owner);
 }
 
 function failureText(failure) {
@@ -102,7 +101,7 @@ async function broadcastAndWaitSafe(raw) {
 const aave = new ethers.Contract(BASE.pool, [
   'function getUserAccountData(address) view returns (uint256 totalCollateralBase, uint256 totalDebtBase, uint256 availableBorrowsBase, uint256 currentLiquidationThreshold, uint256 ltv, uint256 healthFactor)',
 ], base);
-const erc20 = (a) => new ethers.Contract(a, ['function balanceOf(address) view returns (uint256)'], base);
+const erc20 = (a) => new ethers.Contract(a, ['function balanceOf(address) view returns (uint256)', 'function allowance(address,address) view returns (uint256)'], base);
 
 async function account(address) {
   const d = await aave.getUserAccountData(address);
@@ -114,7 +113,9 @@ async function account(address) {
     liquidationThreshold: Number(d.currentLiquidationThreshold) / 10000,
     eth:Number(ethers.formatEther(await base.getBalance(address))),
     usdc: Number(ethers.formatUnits(await erc20(BASE.usdc).balanceOf(address), 6)),
+    usdcAllowance: Number(ethers.formatUnits(await erc20(BASE.usdc).allowance(address, BASE.pool), 6)),
     cbeth: Number(ethers.formatUnits(await erc20(BASE.cbeth).balanceOf(address), 18)),
+    cbethAllowance: Number(ethers.formatUnits(await erc20(BASE.cbeth).allowance(address, BASE.pool), 18)),
   };
 }
 
@@ -141,6 +142,6 @@ function attacks(s, f) {
 }
 
 /** Which layer refused a request: NEAR rejects a disallowed access-key use before execution; anything else failed inside the contract. */
-const refusedBy = (error) => (/MethodNameMismatch|NotEnoughAllowance|RequiresFullAccess|ReceiverMismatch|access key/i.test(error) ? 'NEAR access key' : 'Lifeguard contract');
+const refusedBy = (error) => (/MethodNameMismatch|NotEnoughAllowance|RequiresFullAccess|ReceiverMismatch|KeyNotFound|access key/i.test(error) ? 'NEAR access key' : 'Lifeguard contract');
 
 module.exports = { BASE, NEAR_EXPLORER, base, call, view, fees, broadcastAndWaitSafe, account, state, save, nearConnection, ownerAccount, agentAccount, credentials, sleep, attacks, refusedBy };
