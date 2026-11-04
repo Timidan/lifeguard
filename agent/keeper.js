@@ -110,7 +110,7 @@ async function tick(L, id, owner, st, { trigger, target, dryRun }) {
       const proven = p.history.some((e) => e.tx_hash === st.work.signed.tx_hash && e.proven);
       st.lastActionAt = Date.now();
       st.work = null;
-      log(proven ? 'confirmed' : 'superseded');
+      log(proven ? 'confirmed' : 'superseded', proven && !row.nearProof ? { confirmedBy: 'another relayer' } : {});
     }
 
     if (!st.work) {
@@ -162,9 +162,10 @@ async function tick(L, id, owner, st, { trigger, target, dryRun }) {
         await L.sleep(45000);
       }
       const proof = await L.call(st.work.acct, contract, 'confirm', { id, tx_hash: st.work.signed.tx_hash });
+      // Only an accepted proof is recorded; a failed attempt (e.g. another relayer proved it first) is not evidence.
+      if (proof.value !== true) throw new Error(proof.error || 'Read MPC proof not accepted yet');
       row.nearProof = proof.txHash;
       st.work.row.nearProof = proof.txHash;
-      if (proof.value !== true) throw new Error(proof.error || 'Read MPC proof not accepted yet');
       st.lastActionAt = Date.now();
       st.work = null;
       log('confirmed');
