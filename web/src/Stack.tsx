@@ -2,7 +2,8 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { BASE_TX, ExternalLink, NEAR_TX, num, rescue, sendAttack, short, type Position, type Result } from './App';
 import { Aave, Base, Near } from './Logos';
 
-const requests = ['Repay 1,000 USDC', 'Withdraw collateral', 'Send NEAR away'] as const;
+// The repay is the recorded rescue, so its label follows evidence.json.
+const requests = [rescue.action, 'Withdraw collateral', 'Send NEAR away'];
 const plates = [
   { id: 'key', name: 'Access key', y: 145, at: 510, word: 'Accepted' },
   { id: 'contract', name: 'Lifeguard contract', y: 270, at: 880, word: 'Built' },
@@ -154,7 +155,7 @@ export function Stack({ p }: { p: Position | null }) {
               <p className="text-[1.25rem] leading-relaxed text-ink-2">{captions[selected][0]}</p>
               <p className="mt-4 font-mono text-[0.875rem] leading-relaxed break-all text-muted-foreground">{captions[selected][1]}</p>
             </> : pick === requests[0] ? <>
-              <p className="font-serif text-[1.625rem] tracking-tight text-safe">Repaid 1,000 USDC.</p>
+              <p className="font-serif text-[1.625rem] tracking-tight text-safe">{rescue.action.replace(/^Repay/, 'Repaid')}.</p>
               <div className="tnum mt-4 space-y-1 font-mono text-[0.875rem] text-ink-2">
                 <p>Health factor {rescue.before} → {rescue.after}</p>
                 <p>Debt ${num(rescue.debtBefore, 0)} → ${num(rescue.debtAfter, 0)}</p>
